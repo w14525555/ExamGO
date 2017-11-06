@@ -165,7 +165,15 @@ test27 = TestCase $
   (parseStringCmds opt " 3 + 5 ?? 2 < 3 ?") $
   Right [CQuery (TFun "+" [TNum 3,TNum 5]) True,CQuery (TFun "<" [TNum 2,TNum 3]) False]
 
-cmdTest = [test22, test23, test24, test25, test26, test27]
+test28 =  TestCase $
+  assertEqual "Test multiple Cmd"
+  (parseStringCmds opt "D(x,t1*t2) = t1*D(x,t2) + t2*D(x,t1).") $
+  Right [CRule (Rule (TFun "D" [TVar "x",TFun "*" [TVar "t1",TVar "t2"]]) 
+  (TFun "+" [TFun "*" [TVar "t1",TFun "D" [TVar "x",TVar "t2"]],
+  TFun "*" [TVar "t2",TFun "D" [TVar "x",TVar "t1"]]]) [])]
+  
+
+cmdTest = [test22, test23, test24, test25, test26, test27, test28]
 
 -- Test for the Optation
 

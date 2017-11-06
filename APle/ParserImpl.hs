@@ -8,7 +8,6 @@ import Text.ParserCombinators.ReadP
 -- Term ::= vname | number | fname ‘(’ Termz ‘)’ | Term oper Term | ‘(’ Term ‘)’
 -- Termz ::= e | Terms
 -- Terms ::= Term | Term ‘,’ Terms
-
 -- Cond ::= pname ‘(’ Termz ‘)’ | pname ‘(’ Termz ‘;’ Terms ‘)’
 -- Conds ::= Cond | Cond ‘,’ Conds
 -- Rule ::= Term ‘=’ Term ‘.’ | Term ‘=’ Term ‘|’ Conds ‘.’
