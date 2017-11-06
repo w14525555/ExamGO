@@ -1,0 +1,5 @@
+OpTable
+  [(FNone, ["<=", "<"]),
+   (FLeft, ["+", "-"]),
+   (FLeft, ["*"]),
+   (FRight, ["**"])]

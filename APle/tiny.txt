@@ -1,0 +1,6 @@
+[CRule (Rule (TFun "+" [TNum 0,TVar "t"]) (TVar "t") []),
+ CRule (Rule (TFun "+" [TVar "t",TNum 0]) (TVar "t") []),
+ CRule (Rule (TFun "+" [TVar "t1",TFun "+" [TVar "t2",TVar "t3"]])
+             (TFun "+" [TFun "+" [TVar "t1",TVar "t2"],TVar "t3"]) []),
+ CRule (Rule (TFun "+" [TVar "t",TVar "t"]) (TFun "*" [TNum 2,TVar "t"]) []),
+ CRule (Rule (TFun "*" [TNum 0,TVar "t"]) (TNum 0) [])]
