@@ -40,53 +40,53 @@ toFunction fname t1 t2 = TFun fname [t1, t2]
 
 -- do not change the type!
 parseStringTerm :: OpTable -> String -> Either ErrMsg Term
-parseStringTerm opt input = case readP_to_S (parseOptTerm opt <* eof) input of 
+parseStringTerm opt input = case readP_to_S (parseOptTerm opt opt <* eof) input of 
     [(result, [])] -> Right result
     [] -> Left "empty result probably with wrong intput"
     a:b:cs -> Left "ambiguous error"
 
-parseStringCmds :: OpTable -> String -> Either ErrMsg [Cmd]
-parseStringCmds opt input = case readP_to_S (parseCmds <* eof) input of 
-    [(result, [])] -> Right result
-    [] -> Left "empty result probably with wrong intput"
-    a:b:cs -> Left "ambiguous error"
+-- parseStringCmds :: OpTable -> String -> Either ErrMsg [Cmd]
+-- parseStringCmds opt input = case readP_to_S (parseCmds <* eof) input of 
+--     [(result, [])] -> Right result
+--     [] -> Left "empty result probably with wrong intput"
+--     a:b:cs -> Left "ambiguous error"
 
--- An API used to test Cmds
-parseCmdsWithoutOpTable :: String -> Either ErrMsg [Cmd]
-parseCmdsWithoutOpTable input = case readP_to_S (parseCmds <* eof) input of 
-    [(result, [])] -> Right result
-    [] -> Left "empty result probably with wrong intput"
-    a:b:cs -> Left "ambiguous error"
+-- -- An API used to test Cmds
+-- parseCmdsWithoutOpTable :: String -> Either ErrMsg [Cmd]
+-- parseCmdsWithoutOpTable input = case readP_to_S (parseCmds <* eof) input of 
+--     [(result, [])] -> Right result
+--     [] -> Left "empty result probably with wrong intput"
+--     a:b:cs -> Left "ambiguous error"
 
 -- Internal Functions
 
-type OpTableItem = (Fixity, [FName])
+type OpTableElement = (Fixity, [FName])
 
 --- Opt functions
 -- Parse Term
-parseOptTerm :: OpTable -> ReadP Term
-parseOptTerm (OpTable [o]) = parseOptItem o
-parseOptTerm (OpTable ((FNone, fnames):os)) = do
-    chainl1 (parseOptTerm (OpTable os)) (combineOperations fnames)
-parseOptTerm (OpTable ((FLeft, fnames):os)) = do
-    chainl1 (parseOptTerm (OpTable os)) (combineOperations fnames)
-parseOptTerm (OpTable ((FRight, fnames):os)) = do
-    chainr1 (parseOptTerm (OpTable os)) (combineOperations fnames)
+parseOptTerm :: OpTable -> OpTable -> ReadP Term
+parseOptTerm (OpTable [o]) opt = parseOptItem o opt
+parseOptTerm (OpTable ((FNone, fnames):os)) opt = do
+    chainl1 (parseOptTerm (OpTable os) opt) (combineOperations fnames)
+parseOptTerm (OpTable ((FLeft, fnames):os)) opt = do
+    chainl1 (parseOptTerm (OpTable os) opt) (combineOperations fnames)
+parseOptTerm (OpTable ((FRight, fnames):os)) opt = do
+    chainr1 (parseOptTerm (OpTable os) opt) (combineOperations fnames)
 
-parseOptItem :: OpTableItem -> ReadP Term
-parseOptItem (FNone, names) = parseOptableNoneOrLeft names
-parseOptItem (FLeft, names) = parseOptableNoneOrLeft names
-parseOptItem (FRight, names) = parseOptableRight names
+parseOptItem :: OpTableElement -> OpTable -> ReadP Term
+parseOptItem (FNone, names) opt = parseOptableNoneOrLeft names opt
+parseOptItem (FLeft, names) opt = parseOptableNoneOrLeft names opt
+parseOptItem (FRight, names) opt = parseOptableRight names opt
 
 -- Handle the case of Fixity = FLeft | FNone
-parseOptableNoneOrLeft :: [FName] -> ReadP Term
-parseOptableNoneOrLeft fnames = do 
-    chainl1 parseBottomTerms (combineOperations fnames)
+parseOptableNoneOrLeft :: [FName] -> OpTable -> ReadP Term
+parseOptableNoneOrLeft fnames opt = do 
+    chainl1 (parseBottomTerms opt) (combineOperations fnames)
 
 -- Handle the case of Fixity = FRight
-parseOptableRight :: [FName] -> ReadP Term
-parseOptableRight fnames = do 
-    chainr1 parseBottomTerms (combineOperations fnames) 
+parseOptableRight :: [FName] -> OpTable -> ReadP Term
+parseOptableRight fnames opt = do 
+    chainr1 (parseBottomTerms opt) (combineOperations fnames) 
 
 -- Combine the operations 
 combineOperations :: [FName] -> ReadP (Term -> Term -> Term)
@@ -99,117 +99,97 @@ operations fname = do
     opt <- string fname
     return (toFunction opt)
 
+-- -- Parse Cmds
+-- parseCmds :: ReadP [Cmd]
+-- parseCmds = parseNonEmptyCmds +++ (token $ return [])
 
--- Parse Cmds
-parseCmds :: ReadP [Cmd]
-parseCmds = parseNonEmptyCmds +++ (token $ return [])
+-- parseNonEmptyCmds :: ReadP [Cmd]
+-- parseNonEmptyCmds = do
+--     c <- parseCmd
+--     cs <- parseCmds
+--     return $ c:cs
 
-parseNonEmptyCmds :: ReadP [Cmd]
-parseNonEmptyCmds = do
-    c <- parseCmd
-    cs <- parseCmds
-    return $ c:cs
+-- parseCmd :: ReadP Cmd
+-- parseCmd = parseRuleCmd +++ parseFlagCmd
 
-parseCmd :: ReadP Cmd
-parseCmd = parseRuleCmd +++ parseFlagCmd
+-- parseRuleCmd :: ReadP Cmd
+-- parseRuleCmd = do
+--     r <- parseRule
+--     return $ CRule r
 
-parseRuleCmd :: ReadP Cmd
-parseRuleCmd = do
-    r <- parseRule
-    return $ CRule r
+-- parseFlagCmd :: ReadP Cmd
+-- parseFlagCmd = do
+--     t <- parseTerm
+--     flag <- parseFlag
+--     token $ return $ CQuery t flag
 
-parseFlagCmd :: ReadP Cmd
-parseFlagCmd = do
-    t <- parseTerm
-    flag <- parseFlag
-    token $ return $ CQuery t flag
+-- parseFlag :: ReadP Bool
+-- parseFlag = do
+--     f <- many1 (satisfy (`elem` ['?']))
+--     if f == "?" 
+--         then return False 
+--         else if f == "??" 
+--             then return True 
+--             else pfail
 
-parseFlag :: ReadP Bool
-parseFlag = do
-    f <- many1 (satisfy (`elem` ['?']))
-    if f == "?" 
-        then return False 
-        else if f == "??" 
-            then return True 
-            else pfail
+-- -- Parse Rule
+-- parseRule :: ReadP Rule
+-- parseRule = parseTermTermDot +++ parseTermTermConds
 
--- Parse Rule
-parseRule :: ReadP Rule
-parseRule = parseTermTermDot +++ parseTermTermConds
+-- parseTermTermDot :: ReadP Rule
+-- parseTermTermDot = do
+--     t1 <- parseTerm
+--     _ <- char '='
+--     t2 <- parseTerm
+--     _ <- char '.'
+--     token $ return $ Rule t1 t2 []
 
-parseTermTermDot :: ReadP Rule
-parseTermTermDot = do
-    t1 <- parseTerm
-    _ <- char '='
-    t2 <- parseTerm
-    _ <- char '.'
-    token $ return $ Rule t1 t2 []
+-- parseTermTermConds :: ReadP Rule
+-- parseTermTermConds = do
+--     t1 <- parseTerm
+--     _ <- char '='
+--     t2 <- parseTerm
+--     _ <- char '|'
+--     cs <- parseConds
+--     _ <- char '.'
+--     token $ return $ Rule t1 t2 cs
 
-parseTermTermConds :: ReadP Rule
-parseTermTermConds = do
-    t1 <- parseTerm
-    _ <- char '='
-    t2 <- parseTerm
-    _ <- char '|'
-    cs <- parseConds
-    _ <- char '.'
-    token $ return $ Rule t1 t2 cs
+-- parseConds :: ReadP [Cond]
+-- parseConds =  parseSingleCond +++ parseCommaConds
 
-parseConds :: ReadP [Cond]
-parseConds =  parseSingleCond +++ parseCommaConds
+-- parseSingleCond :: ReadP [Cond]
+-- parseSingleCond = do
+--     c <- parseCond
+--     return [c]
 
-parseSingleCond :: ReadP [Cond]
-parseSingleCond = do
-    c <- parseCond
-    return [c]
+-- parseCommaConds :: ReadP [Cond]
+-- parseCommaConds = do
+--     c <- parseCond
+--     _ <- char ','
+--     cs <- parseConds
+--     return $ c:cs
 
-parseCommaConds :: ReadP [Cond]
-parseCommaConds = do
-    c <- parseCond
-    _ <- char ','
-    cs <- parseConds
-    return $ c:cs
+-- -- Parse Condition
+-- parseCond :: ReadP Cond
+-- parseCond = do
+--     pname <- parseVFPNames
+--     _ <- char '('
+--     ts1 <- parseTermZ
+--     ts2 <- parseSecondPartCond
+--     _ <- char ')'
+--     token $ return $ Cond pname ts1 ts2
 
--- Parse Condition
-parseCond :: ReadP Cond
-parseCond = do
-    pname <- parseVFPNames
-    _ <- char '('
-    ts1 <- parseTermZ
-    ts2 <- parseSecondPartCond
-    _ <- char ')'
-    token $ return $ Cond pname ts1 ts2
+-- parseSecondPartCond :: ReadP [Term]
+-- parseSecondPartCond = parseSecondTerms +++ (return [])
 
-parseSecondPartCond :: ReadP [Term]
-parseSecondPartCond = parseSecondTerms +++ (return [])
+-- parseSecondTerms :: ReadP [Term]
+-- parseSecondTerms = do
+--     _ <- char ';'
+--     ts <- parseTerms
+--     return ts
 
-parseSecondTerms :: ReadP [Term]
-parseSecondTerms = do
-    _ <- char ';'
-    ts <- parseTerms
-    return ts
-
--- Parse Term
--- Hard Coded Operators 
-parseTerm :: ReadP Term
-parseTerm = do
-    chainl1 parseTerm1 topPrecedentOp
-
--- Hard Coded Operators 
-parseTerm1 :: ReadP Term
-parseTerm1 = do
-    chainl1 parseTerm2 secondPrecedentOp
-
-parseTerm2 :: ReadP Term
-parseTerm2 = do
-    chainl1 parseTerm3 thirdPrecedentOp
-
-parseTerm3 :: ReadP Term
-parseTerm3 = do
-    chainr1 parseBottomTerms fourthPrecedentOp
-
-parseBottomTerms :: ReadP Term
-parseBottomTerms = parseNumberTerm +++ parseVNameTerm +++ parseFuncTerm +++ parseParentheseTerm
+parseBottomTerms :: OpTable -> ReadP Term
+parseBottomTerms opt = parseNumberTerm +++ parseVNameTerm +++ (parseFuncTerm opt) +++ (parseParentheseTerm opt)
 
 --Bottom parsers
 parseNumberTerm :: ReadP Term
@@ -222,37 +202,37 @@ parseVNameTerm = do
     vname <- parseVFPNames
     return $ TVar vname
 
-parseFuncTerm :: ReadP Term
-parseFuncTerm = do
+parseFuncTerm :: OpTable -> ReadP Term
+parseFuncTerm opt = do
     fname <- parseVFPNames
     _ <- char '('
-    terms <- parseTermZ
+    terms <- parseTermZ opt
     _ <- char ')'
     skipSpaces
     return $ TFun fname terms
 
-parseTermZ :: ReadP [Term]
-parseTermZ = parseTerms +++ (token (return []))
+parseTermZ :: OpTable -> ReadP [Term]
+parseTermZ opt = (parseTerms opt) +++ (token (return []))
 
-parseTerms :: ReadP [Term]
-parseTerms = parseSingleTerm +++ parseCommaTerms
+parseTerms :: OpTable -> ReadP [Term]
+parseTerms opt = (parseSingleTerm opt) +++ (parseCommaTerms opt)
 
-parseSingleTerm :: ReadP [Term]
-parseSingleTerm = do
-    t <- parseTerm
+parseSingleTerm :: OpTable -> ReadP [Term]
+parseSingleTerm opt = do
+    t <- parseOptTerm opt opt
     return [t]
 
-parseCommaTerms :: ReadP [Term]
-parseCommaTerms = do
-    t <- parseTerm
+parseCommaTerms :: OpTable -> ReadP [Term]
+parseCommaTerms opt = do
+    t <- parseOptTerm opt opt
     _ <- char ','
-    ts <- parseTerms
+    ts <- parseTerms opt
     return $ t:ts
 
-parseParentheseTerm :: ReadP Term
-parseParentheseTerm = do
+parseParentheseTerm :: OpTable -> ReadP Term
+parseParentheseTerm opt = do
     _ <- token $ char '('
-    t <- parseTerm
+    t <- parseOptTerm opt opt
     _ <- char ')'
     skipSpaces
     return t
