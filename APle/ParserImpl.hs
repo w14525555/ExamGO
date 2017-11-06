@@ -45,18 +45,11 @@ parseStringTerm opt input = case readP_to_S (parseOptTerm opt opt <* eof) input 
     [] -> Left "empty result probably with wrong intput"
     a:b:cs -> Left "ambiguous error"
 
--- parseStringCmds :: OpTable -> String -> Either ErrMsg [Cmd]
--- parseStringCmds opt input = case readP_to_S (parseCmds <* eof) input of 
---     [(result, [])] -> Right result
---     [] -> Left "empty result probably with wrong intput"
---     a:b:cs -> Left "ambiguous error"
-
--- -- An API used to test Cmds
--- parseCmdsWithoutOpTable :: String -> Either ErrMsg [Cmd]
--- parseCmdsWithoutOpTable input = case readP_to_S (parseCmds <* eof) input of 
---     [(result, [])] -> Right result
---     [] -> Left "empty result probably with wrong intput"
---     a:b:cs -> Left "ambiguous error"
+parseStringCmds :: OpTable -> String -> Either ErrMsg [Cmd]
+parseStringCmds opt input = case readP_to_S (parseOptCmds opt <* eof) input of 
+     [(result, [])] -> Right result
+     [] -> Left "empty result probably with wrong intput"
+     a:b:cs -> Left "ambiguous error"
 
 -- Internal Functions
 
@@ -99,94 +92,94 @@ operations fname = do
     opt <- string fname
     return (toFunction opt)
 
--- -- Parse Cmds
--- parseCmds :: ReadP [Cmd]
--- parseCmds = parseNonEmptyCmds +++ (token $ return [])
+-- Parse Cmds
+parseOptCmds :: OpTable -> ReadP [Cmd]
+parseOptCmds opt = (parseNonEmptyCmds opt) +++ (token $ return [])
 
--- parseNonEmptyCmds :: ReadP [Cmd]
--- parseNonEmptyCmds = do
---     c <- parseCmd
---     cs <- parseCmds
---     return $ c:cs
+parseNonEmptyCmds :: OpTable -> ReadP [Cmd]
+parseNonEmptyCmds opt = do
+    c <- parseCmd opt
+    cs <- parseOptCmds opt
+    return $ c:cs
 
--- parseCmd :: ReadP Cmd
--- parseCmd = parseRuleCmd +++ parseFlagCmd
+parseCmd :: OpTable -> ReadP Cmd
+parseCmd opt = (parseRuleCmd opt) +++ (parseFlagCmd opt)
 
--- parseRuleCmd :: ReadP Cmd
--- parseRuleCmd = do
---     r <- parseRule
---     return $ CRule r
+parseRuleCmd :: OpTable -> ReadP Cmd
+parseRuleCmd opt = do
+    r <- parseRule opt
+    return $ CRule r
 
--- parseFlagCmd :: ReadP Cmd
--- parseFlagCmd = do
---     t <- parseTerm
---     flag <- parseFlag
---     token $ return $ CQuery t flag
+parseFlagCmd :: OpTable -> ReadP Cmd
+parseFlagCmd opt = do
+    t <- parseOptTerm opt opt
+    flag <- parseFlag
+    token $ return $ CQuery t flag
 
--- parseFlag :: ReadP Bool
--- parseFlag = do
---     f <- many1 (satisfy (`elem` ['?']))
---     if f == "?" 
---         then return False 
---         else if f == "??" 
---             then return True 
---             else pfail
+parseFlag :: ReadP Bool
+parseFlag = do
+    f <- many1 (satisfy (`elem` ['?']))
+    if f == "?" 
+        then return False 
+        else if f == "??" 
+            then return True 
+            else pfail
 
--- -- Parse Rule
--- parseRule :: ReadP Rule
--- parseRule = parseTermTermDot +++ parseTermTermConds
+-- Parse Rule
+parseRule :: OpTable -> ReadP Rule
+parseRule opt = (parseTermTermDot opt) +++ (parseTermTermConds opt)
 
--- parseTermTermDot :: ReadP Rule
--- parseTermTermDot = do
---     t1 <- parseTerm
---     _ <- char '='
---     t2 <- parseTerm
---     _ <- char '.'
---     token $ return $ Rule t1 t2 []
+parseTermTermDot :: OpTable -> ReadP Rule
+parseTermTermDot opt = do
+    t1 <- parseOptTerm opt opt
+    _ <- char '='
+    t2 <- parseOptTerm opt opt
+    _ <- char '.'
+    token $ return $ Rule t1 t2 []
 
--- parseTermTermConds :: ReadP Rule
--- parseTermTermConds = do
---     t1 <- parseTerm
---     _ <- char '='
---     t2 <- parseTerm
---     _ <- char '|'
---     cs <- parseConds
---     _ <- char '.'
---     token $ return $ Rule t1 t2 cs
+parseTermTermConds :: OpTable -> ReadP Rule
+parseTermTermConds opt = do
+    t1 <- parseOptTerm opt opt
+    _ <- char '='
+    t2 <- parseOptTerm opt opt
+    _ <- char '|'
+    cs <- parseConds opt
+    _ <- char '.'
+    token $ return $ Rule t1 t2 cs
 
--- parseConds :: ReadP [Cond]
--- parseConds =  parseSingleCond +++ parseCommaConds
+parseConds :: OpTable -> ReadP [Cond]
+parseConds opt = (parseSingleCond opt) +++ (parseCommaConds opt)
 
--- parseSingleCond :: ReadP [Cond]
--- parseSingleCond = do
---     c <- parseCond
---     return [c]
+parseSingleCond :: OpTable -> ReadP [Cond]
+parseSingleCond opt = do
+    c <- parseCond opt
+    return [c]
 
--- parseCommaConds :: ReadP [Cond]
--- parseCommaConds = do
---     c <- parseCond
---     _ <- char ','
---     cs <- parseConds
---     return $ c:cs
+parseCommaConds :: OpTable -> ReadP [Cond]
+parseCommaConds opt = do
+    c <- parseCond opt
+    _ <- char ','
+    cs <- parseConds opt
+    return $ c:cs
 
--- -- Parse Condition
--- parseCond :: ReadP Cond
--- parseCond = do
---     pname <- parseVFPNames
---     _ <- char '('
---     ts1 <- parseTermZ
---     ts2 <- parseSecondPartCond
---     _ <- char ')'
---     token $ return $ Cond pname ts1 ts2
+-- Parse Condition
+parseCond :: OpTable -> ReadP Cond
+parseCond opt = do
+    pname <- parseVFPNames
+    _ <- char '('
+    ts1 <- parseTermZ opt
+    ts2 <- parseSecondPartCond opt
+    _ <- char ')'
+    token $ return $ Cond pname ts1 ts2
 
--- parseSecondPartCond :: ReadP [Term]
--- parseSecondPartCond = parseSecondTerms +++ (return [])
+parseSecondPartCond :: OpTable -> ReadP [Term]
+parseSecondPartCond opt = (parseSecondTerms opt) +++ (return [])
 
--- parseSecondTerms :: ReadP [Term]
--- parseSecondTerms = do
---     _ <- char ';'
---     ts <- parseTerms
---     return ts
+parseSecondTerms :: OpTable -> ReadP [Term]
+parseSecondTerms opt = do
+    _ <- char ';'
+    ts <- parseTerms opt
+    return ts
 
 parseBottomTerms :: OpTable -> ReadP Term
 parseBottomTerms opt = parseNumberTerm +++ parseVNameTerm +++ (parseFuncTerm opt) +++ (parseParentheseTerm opt)
@@ -237,48 +230,6 @@ parseParentheseTerm opt = do
     skipSpaces
     return t
 
-topPrecedentOp :: ReadP (Term -> Term -> Term)
-topPrecedentOp = lessEqual +++ less
-
-secondPrecedentOp :: ReadP (Term -> Term -> Term)
-secondPrecedentOp = plus +++ minus
-
-thirdPrecedentOp :: ReadP (Term -> Term -> Term)
-thirdPrecedentOp = multiply
-
-fourthPrecedentOp :: ReadP (Term -> Term -> Term)
-fourthPrecedentOp = doubleStar
-
-plus :: ReadP (Term -> Term -> Term)
-plus = do
-    opt <- string "+"
-    return (toFunction opt)
-
-minus :: ReadP (Term -> Term -> Term)
-minus = do
-    opt <- string "-"
-    return (toFunction opt)
-
-lessEqual :: ReadP (Term -> Term -> Term)
-lessEqual = do
-    opt <- string "<="
-    return (toFunction opt)
-
-less :: ReadP (Term -> Term -> Term)
-less = do
-    opt <- string "<"
-    return (toFunction opt)
-
-multiply :: ReadP (Term -> Term -> Term)
-multiply = do
-    opt <- string "*"
-    return (toFunction opt)
-
-doubleStar :: ReadP (Term -> Term -> Term)
-doubleStar = do
-    opt <- string "**"
-    return (toFunction opt)   
-
 -- Parser for VFP names
 parseVFPNames :: ReadP String
 parseVFPNames = do
@@ -301,8 +252,50 @@ parseNegtiveNumber = do
     ns <- many1 (satisfy (`elem` digit))
     token $ return (read ("-" ++ ns) :: Integer)
 
--- Parse Operators
-parseOper :: ReadP String
-parseOper = do
-    ops <- token $ many1 (satisfy (`elem` operators))
-    if ops == "=" then pfail else token $ return ops
+-- -- Parse Operators
+-- parseOper :: ReadP String
+-- parseOper = do
+--     ops <- token $ many1 (satisfy (`elem` operators))
+--     if ops == "=" then pfail else token $ return ops
+
+-- topPrecedentOp :: ReadP (Term -> Term -> Term)
+-- topPrecedentOp = lessEqual +++ less
+
+-- secondPrecedentOp :: ReadP (Term -> Term -> Term)
+-- secondPrecedentOp = plus +++ minus
+
+-- thirdPrecedentOp :: ReadP (Term -> Term -> Term)
+-- thirdPrecedentOp = multiply
+
+-- fourthPrecedentOp :: ReadP (Term -> Term -> Term)
+-- fourthPrecedentOp = doubleStar
+
+-- plus :: ReadP (Term -> Term -> Term)
+-- plus = do
+--     opt <- string "+"
+--     return (toFunction opt)
+
+-- minus :: ReadP (Term -> Term -> Term)
+-- minus = do
+--     opt <- string "-"
+--     return (toFunction opt)
+
+-- lessEqual :: ReadP (Term -> Term -> Term)
+-- lessEqual = do
+--     opt <- string "<="
+--     return (toFunction opt)
+
+-- less :: ReadP (Term -> Term -> Term)
+-- less = do
+--     opt <- string "<"
+--     return (toFunction opt)
+
+-- multiply :: ReadP (Term -> Term -> Term)
+-- multiply = do
+--     opt <- string "*"
+--     return (toFunction opt)
+
+-- doubleStar :: ReadP (Term -> Term -> Term)
+-- doubleStar = do
+--     opt <- string "**"
+--     return (toFunction opt)   

@@ -112,12 +112,12 @@ givenExampleTest = TestCase $
 -- Tests for Cond
 test18 = TestCase $
   assertEqual "Test Cond with only one term"
-  (parseCmdsWithoutOpTable " 1 = 5 | name ( 1 + 3 ).") $
+  (parseStringCmds opt " 1 = 5 | name ( 1 + 3 ).") $
   Right [CRule (Rule (TNum 1) (TNum 5) [Cond "name" [TFun "+" [TNum 1,TNum 3]] []])]
 
 test19 = TestCase $
   assertEqual "Test Cond with several terms"
-  (parseCmdsWithoutOpTable "1 = 5 | name ( 1 + 3 ; f(y, 3) ).") $
+  (parseStringCmds opt "1 = 5 | name ( 1 + 3 ; f(y, 3) ).") $
   Right [CRule (Rule (TNum 1) (TNum 5) [Cond "name" [TFun "+" [TNum 1,TNum 3]] [TFun "f" [TVar "y",TNum 3]]])]
 
 condTest = [test18, test19]
@@ -125,44 +125,44 @@ condTest = [test18, test19]
 -- Test for Rules
 test20 = TestCase $
   assertEqual "Test a rule with empty conds"
-  (parseCmdsWithoutOpTable "1 + 3 = 3 * 5.") $
+  (parseStringCmds opt "1 + 3 = 3 * 5.") $
   Right [CRule (Rule (TFun "+" [TNum 1,TNum 3]) (TFun "*" [TNum 3,TNum 5]) [])]  
 
 test21 = TestCase $
   assertEqual "Test a rule with empty conds"
-  (parseCmdsWithoutOpTable "1 + 3 = 3 * 5 | f(3), f(z, 5).") $
+  (parseStringCmds opt "1 + 3 = 3 * 5 | f(3), f(z, 5).") $
   Right [CRule (Rule (TFun "+" [TNum 1,TNum 3]) (TFun "*" [TNum 3,TNum 5]) [Cond "f" [TNum 3] [],Cond "f" [TVar "z",TNum 5] []])] 
 rulTest = [test20, test21]
 
 -- Test for Cmd
 test22 = TestCase $
   assertEqual "Test a empty cmd"
-  (parseCmdsWithoutOpTable " ") $
+  (parseStringCmds opt " ") $
   Right []
 
 test23 = TestCase $
   assertEqual "Test a rule cmd"
-  (parseCmdsWithoutOpTable " 3 = 5 .") $
+  (parseStringCmds opt " 3 = 5 .") $
   Right [CRule (Rule (TNum 3) (TNum 5) [])]
 
 test24 = TestCase $
   assertEqual "Test a cmd with one question mark"
-  (parseCmdsWithoutOpTable " 3 + 5 ?") $
+  (parseStringCmds opt " 3 + 5 ?") $
   Right [CQuery (TFun "+" [TNum 3,TNum 5]) False]
 
 test25 = TestCase $
   assertEqual "Test a cmd with two question mark"
-  (parseCmdsWithoutOpTable " 3 + 5 ??") $
+  (parseStringCmds opt " 3 + 5 ??") $
   Right [CQuery (TFun "+" [TNum 3,TNum 5]) True]
 
 test26 = TestCase $
   assertEqual "Test a cmd cannot have more than two question mark"
-  (parseCmdsWithoutOpTable " 3 + 5 ???") $
+  (parseStringCmds opt " 3 + 5 ???") $
   Left "empty result probably with wrong intput"
 
 test27 = TestCase $
   assertEqual "Test multiple Cmd"
-  (parseCmdsWithoutOpTable " 3 + 5 ?? 2 < 3 ?") $
+  (parseStringCmds opt " 3 + 5 ?? 2 < 3 ?") $
   Right [CQuery (TFun "+" [TNum 3,TNum 5]) True,CQuery (TFun "<" [TNum 2,TNum 3]) False]
 
 cmdTest = [test22, test23, test24, test25, test26, test27]
