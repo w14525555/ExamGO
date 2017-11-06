@@ -93,6 +93,7 @@ operations fname = do
     return (toFunction opt)
 
 -- Parse Cmds
+-- Cmds ::= e | Cmd Cmds
 parseOptCmds :: OpTable -> ReadP [Cmd]
 parseOptCmds opt = (parseNonEmptyCmds opt) +++ (token $ return [])
 
@@ -102,6 +103,7 @@ parseNonEmptyCmds opt = do
     cs <- parseOptCmds opt
     return $ c:cs
 
+-- Cmd ::= Rule | Term ‘?’ | Term ‘??’
 parseCmd :: OpTable -> ReadP Cmd
 parseCmd opt = (parseRuleCmd opt) +++ (parseFlagCmd opt)
 
@@ -126,6 +128,7 @@ parseFlag = do
             else pfail
 
 -- Parse Rule
+-- Rule ::= Term ‘=’ Term ‘.’ | Term ‘=’ Term ‘|’ Conds ‘.’
 parseRule :: OpTable -> ReadP Rule
 parseRule opt = (parseTermTermDot opt) +++ (parseTermTermConds opt)
 
@@ -147,6 +150,7 @@ parseTermTermConds opt = do
     _ <- char '.'
     token $ return $ Rule t1 t2 cs
 
+-- Conds ::= Cond | Cond ‘,’ Conds
 parseConds :: OpTable -> ReadP [Cond]
 parseConds opt = (parseSingleCond opt) +++ (parseCommaConds opt)
 
@@ -163,6 +167,7 @@ parseCommaConds opt = do
     return $ c:cs
 
 -- Parse Condition
+-- Cond ::= pname ‘(’ Termz ‘)’ | pname ‘(’ Termz ‘;’ Terms ‘)’
 parseCond :: OpTable -> ReadP Cond
 parseCond opt = do
     pname <- parseVFPNames
@@ -181,6 +186,7 @@ parseSecondTerms opt = do
     ts <- parseTerms opt
     return ts
 
+-- Term ::= vname | number | fname ‘(’ Termz ‘)’ | ‘(’ Term ‘)’
 parseBottomTerms :: OpTable -> ReadP Term
 parseBottomTerms opt = parseNumberTerm +++ parseVNameTerm +++ (parseFuncTerm opt) +++ (parseParentheseTerm opt)
 
@@ -201,8 +207,7 @@ parseFuncTerm opt = do
     _ <- char '('
     terms <- parseTermZ opt
     _ <- char ')'
-    skipSpaces
-    return $ TFun fname terms
+    token $ return $ TFun fname terms
 
 parseTermZ :: OpTable -> ReadP [Term]
 parseTermZ opt = (parseTerms opt) +++ (token (return []))
@@ -227,8 +232,7 @@ parseParentheseTerm opt = do
     _ <- token $ char '('
     t <- parseOptTerm opt opt
     _ <- char ')'
-    skipSpaces
-    return t
+    token $ return t
 
 -- Parser for VFP names
 parseVFPNames :: ReadP String
@@ -251,51 +255,3 @@ parseNegtiveNumber = do
     _ <- token $ char '~'
     ns <- many1 (satisfy (`elem` digit))
     token $ return (read ("-" ++ ns) :: Integer)
-
--- -- Parse Operators
--- parseOper :: ReadP String
--- parseOper = do
---     ops <- token $ many1 (satisfy (`elem` operators))
---     if ops == "=" then pfail else token $ return ops
-
--- topPrecedentOp :: ReadP (Term -> Term -> Term)
--- topPrecedentOp = lessEqual +++ less
-
--- secondPrecedentOp :: ReadP (Term -> Term -> Term)
--- secondPrecedentOp = plus +++ minus
-
--- thirdPrecedentOp :: ReadP (Term -> Term -> Term)
--- thirdPrecedentOp = multiply
-
--- fourthPrecedentOp :: ReadP (Term -> Term -> Term)
--- fourthPrecedentOp = doubleStar
-
--- plus :: ReadP (Term -> Term -> Term)
--- plus = do
---     opt <- string "+"
---     return (toFunction opt)
-
--- minus :: ReadP (Term -> Term -> Term)
--- minus = do
---     opt <- string "-"
---     return (toFunction opt)
-
--- lessEqual :: ReadP (Term -> Term -> Term)
--- lessEqual = do
---     opt <- string "<="
---     return (toFunction opt)
-
--- less :: ReadP (Term -> Term -> Term)
--- less = do
---     opt <- string "<"
---     return (toFunction opt)
-
--- multiply :: ReadP (Term -> Term -> Term)
--- multiply = do
---     opt <- string "*"
---     return (toFunction opt)
-
--- doubleStar :: ReadP (Term -> Term -> Term)
--- doubleStar = do
---     opt <- string "**"
---     return (toFunction opt)   
