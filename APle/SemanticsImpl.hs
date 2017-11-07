@@ -49,7 +49,7 @@ tryS m1 m2 = case runGlobal m1 initialRules of
   Left s1 -> case s1 of
     Nothing -> case runGlobal m2 initialRules of
       Right result2 -> return result2
-      Left  s2 -> case s2 of
+      Left s2 -> case s2 of
         Nothing -> fail "Nothing"
         Just v2 -> fail v2
     Just v1 -> fail v1
@@ -66,25 +66,57 @@ type LEnv = [(VName, Term)]
 newtype Local a = Local {runLocal :: LEnv -> Global (a, LEnv)}
 
 instance Monad Local where
-  return v = undefined
-  t >>= f = undefined
+  return v = Local $ \e -> Global $ \_ -> Right (v, e)
+  t >>= f = Local $ \e ->
+    do (result1, newState1) <- runLocal t e
+       (result2, newState2) <- runLocal (f result1) newState1
+       return (result2, newState2)
 
 instance Functor Local where fmap = liftM
 instance Applicative Local where pure = return; (<*>) = ap
 
 inc :: Global a -> Local a
-inc = undefined
+inc g = undefined
 
 askVar :: VName -> Local Term
-askVar = undefined
+askVar name = Local $ \e -> case findTerm name e of
+  [] -> failH "variable is unbound"
+  [t] -> return (t, e)
 
 tellVar :: VName -> Term -> Local ()
-tellVar = undefined
+tellVar name t = Local $ \e -> case findTerm name e of
+  [] -> return ((), e ++ [(name, t)])
+  [t2] -> if t == t2 then return ((), e) else failS
+
+-- A function to create a initial context for Local
+initialLocalEnv :: LEnv
+initialLocalEnv = [("test", TNum 1)]
+
+-- A function to unwrap the value insides the monds
+testRunLocal :: Local a -> Either (Maybe ErrMsg) (a, LEnv)
+testRunLocal m = testRunGlobal (runLocal m initialLocalEnv)
+
+-- A function to get the Value of a Variable
+-- If unbounded, return []
+-- Else return [t]
+findTerm :: VName -> LEnv -> [Term]
+findTerm vname [] = []
+findTerm vname [(name, t)] = if name == vname then [t] else []
+findTerm vname (n:ns) = (findTerm vname [n]) ++ (findTerm vname ns)
 
 ---- Matching and instantiation
 
+-- To matchTerm 
+-- We can find 
 matchTerm :: Term -> Term -> Local ()
-matchTerm = undefined
+matchTerm (TNum n1) (TNum n2) = return ()
+--If it is a variable name then get the Term from env
+--And assign the new value 
+matchTerm (TVar nameP) (TVar nameT) = do 
+  t <- askVar nameT
+  tellVar nameP t
+matchTerm (TFun fname1 t1)(TFun fname2 t2) = 
+  if fname1 == fname2 then return () else fail "Nothing"
 
 instTerm :: Term -> Local Term
 instTerm = undefined

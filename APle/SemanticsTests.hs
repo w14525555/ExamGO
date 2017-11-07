@@ -15,14 +15,13 @@ test1 = TestCase $
 
 -- test2 = TestCase $
 --   assertEqual "Test failS returns Left Nothing"
---   ((testRunGlobal failS) :: Maybe ErrMsg)$
+--   (testRunGlobal  failS)$
 --   (Left (Just "test"))
 
 -- test3 = TestCase $
 --   assertEqual "Test failH returns Left Just errorMsg"
 --   (testRunGlobal (failH "fail test")) $
 --   Left $ Just "fail test"
-  
 
 globalTest = [test1]
 
