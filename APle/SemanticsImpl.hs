@@ -71,12 +71,16 @@ instance Monad Local where
     do (result1, newState1) <- runLocal t e
        (result2, newState2) <- runLocal (f result1) newState1
        return (result2, newState2)
+  fail "Nothing" = Local $ \_ -> Global $ \_ -> Left Nothing
+  fail s = Local $ \_ -> Global $ \_ -> Left $ Just s
 
 instance Functor Local where fmap = liftM
 instance Applicative Local where pure = return; (<*>) = ap
 
 inc :: Global a -> Local a
 inc g = undefined
+
+--  Global $ \_ -> Local $ \_ -> g
 
 askVar :: VName -> Local Term
 askVar name = Local $ \e -> case findTerm name e of
@@ -115,11 +119,44 @@ matchTerm (TNum n1) (TNum n2) = return ()
 matchTerm (TVar nameP) (TVar nameT) = do 
   t <- askVar nameT
   tellVar nameP t
-matchTerm (TFun fname1 t1)(TFun fname2 t2) = 
+matchTerm (TFun fname1 [])(TFun fname2 []) = 
   if fname1 == fname2 then return () else fail "Nothing"
+matchTerm (TFun fname1 ts1)(TFun fname2 ts2) =
+  if fname1 == fname2
+    then do result <- matchTerms ts1 ts2
+            case result of
+              [] -> return ()
+              _ -> fail "Nothing"
+    else fail "Nothing"
+matchTerm _ _ = fail "Nothing"
+
+-- A function to handle the case of recusive terms
+-- If two term list has different length
+-- they don't not match
+matchTerms :: [Term] -> [Term] -> Local [Term]
+matchTerms [t1] [t2] = do matchTerm t1 t2; return []
+matchTerms (t1:ts1) (t2:ts2) = do
+  t <- matchTerms [t1] [t2]
+  ts <- matchTerms ts1 ts2
+  return $ t ++ ts
+matchTerms _ _ = fail "Nothing"
 
 instTerm :: Term -> Local Term
-instTerm = undefined
+instTerm (TVar vname) = askVar vname
+instTerm (TNum n) = return $ TNum n
+instTerm (TFun fname []) = return (TFun fname [])
+instTerm (TFun fname ts) = do
+  newTs <- instTerms ts
+  return $ TFun fname newTs
+
+instTerms :: [Term] -> Local [Term]
+instTerms [t] = do
+  t1 <- instTerm t
+  return [t1]
+instTerms (t:ts) = do
+  t1 <- instTerms [t] 
+  ts1 <- instTerms ts
+  return $ t1 ++ ts1
 
 ---- Conditions and rule aplication
 
