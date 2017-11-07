@@ -113,7 +113,10 @@ findTerm vname (n:ns) = (findTerm vname [n]) ++ (findTerm vname ns)
 -- To matchTerm 
 -- We can find 
 matchTerm :: Term -> Term -> Local ()
-matchTerm (TNum n1) (TNum n2) = return ()
+-- If they are same constants, they can match: t + 0 and p + 0
+matchTerm (TNum n1) (TNum n2) = if n1 == n2 then return () else fail "Nothing"
+matchTerm (TVar nameP) (TNum n2) = tellVar nameP (TNum n2)
+matchTerm (TVar nameP) (TFun fname2 ts) = tellVar nameP (TFun fname2 ts)
 --If it is a variable name then get the Term from env
 --And assign the new value 
 matchTerm (TVar nameP) (TVar nameT) = do 

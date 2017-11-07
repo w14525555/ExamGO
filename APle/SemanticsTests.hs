@@ -31,7 +31,7 @@ test2 = TestCase $
 test3 = TestCase $
   assertEqual "Test match with number type returns empty"
   (testRunLocal (matchTerm (TNum 1) (TNum 2)))$
-  (Right ((),[("test",TNum 1)]))
+  (Left Nothing)
 
 test4 = TestCase $
   assertEqual "Test match with diffrent function name returns failS"
