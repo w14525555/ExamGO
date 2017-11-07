@@ -15,24 +15,49 @@ type GEnv = [Rule]
 newtype Global a = Global {runGlobal :: GEnv -> Either (Maybe ErrMsg) a}
 
 instance Monad Global where
-  return v = undefined
-  t >>= f = undefined
+  return v = Global $ \_ -> Right v
+  t >>= f = Global $ \r -> do result1 <- runGlobal t r
+                              result2 <- runGlobal (f result1) r
+                              return result2
+  fail "Nothing" = Global $ \_ -> Left Nothing
+  fail s = Global $ \_ -> Left $ Just s
 
 -- You may modify these if you want, but it shouldn't be necessary
 instance Functor Global where fmap = liftM
 instance Applicative Global where pure = return; (<*>) = ap
-  
+
+initialRules :: [Rule]
+initialRules = [ Rule (TFun "+" [TNum 0,TVar "t"]) (TVar "t") [],
+                 Rule (TFun "+" [TVar "t",TNum 0]) (TVar "t") [],
+                 Rule (TFun "+" [TVar "t1",TFun "+" [TVar "t2",TVar "t3"]])
+                (TFun "+" [TFun "+" [TVar "t1",TVar "t2"],TVar "t3"]) [],
+                 Rule (TFun "+" [TVar "t",TVar "t"]) (TFun "*" [TNum 2,TVar "t"]) [],
+                 Rule (TFun "*" [TNum 0,TVar "t"]) (TNum 0) []]
+
 getRules :: Global [Rule]
-getRules = undefined
+getRules = Global $ \r -> Right r
 
 failS :: Global a
-failS = undefined
+failS = fail "Nothing"
 
 failH :: ErrMsg -> Global a
-failH = undefined
+failH s = fail s
 
 tryS :: Global a -> Global a -> Global a
-tryS = undefined
+tryS m1 m2 = case runGlobal m1 initialRules of
+  Right result1 -> return result1
+  Left s1 -> case s1 of
+    Nothing -> case runGlobal m2 initialRules of
+      Right result2 -> return result2
+      Left  s2 -> case s2 of
+        Nothing -> fail "Nothing"
+        Just v2 -> fail v2
+    Just v1 -> fail v1
+
+testRunGlobal :: Global a -> Either (Maybe ErrMsg) a
+testRunGlobal m = case runGlobal m initialRules of
+  Right v -> Right v
+  Left s -> Left s 
 
 ---- Local monad and related functions
 
