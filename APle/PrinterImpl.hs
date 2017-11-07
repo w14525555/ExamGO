@@ -48,18 +48,18 @@ checkParenthese fName ts opt = if (needParenthese fName ts opt)
 -- If the higher function contain any elements in 
 -- The list of Terms, there should be parenthese
 needParenthese :: FName -> [Term] -> OpTable -> Bool
-needParenthese fName ts opt = length hightfunctions /= length (hightfunctions \\ (getFunctionNameList ts))
+needParenthese fName ts opt = length hightfunctions /= length (hightfunctions \\ (getFunctionNameFromTerms ts))
     where hightfunctions = getHigherLevelFunction fName (getNameList opt) opt
 
 -- A function a get all funName in [Term]
-getFunctionNameList :: [Term] -> [FName]
-getFunctionNameList [t] = convertTermToFName t
-getFunctionNameList (t:ts) = (getFunctionNameList [t]) ++ (getFunctionNameList ts)
+getFunctionNameFromTerms :: [Term] -> [FName]
+getFunctionNameFromTerms [t] = convertTermToFName t
+getFunctionNameFromTerms (t:ts) = (getFunctionNameFromTerms [t]) ++ (getFunctionNameFromTerms ts)
 
 convertTermToFName :: Term -> [FName]
 convertTermToFName (TVar v) = []
 convertTermToFName (TNum i) = []
-convertTermToFName (TFun fName ts) = [fName] ++ (getFunctionNameList ts)
+convertTermToFName (TFun fName ts) = [fName] ++ (getFunctionNameFromTerms ts)
 
 -- A function to get all higher operations in the Optable
 getSameLevelFunction :: FName -> OpTable -> [FName]
@@ -67,7 +67,7 @@ getSameLevelFunction fName (OpTable [(_, names)]) = if fName `elem` names then n
 getSameLevelFunction fName (OpTable (n:ns)) = (getSameLevelFunction fName (OpTable [n])) 
                                             ++ (getSameLevelFunction fName (OpTable ns)) 
 
--- A function to get higher level functions
+-- A function to get higher level function names in the Optable 
 getHigherLevelFunction :: FName -> [FName] -> OpTable -> [FName]
 getHigherLevelFunction fName names opt = (take (fromJust (elemIndex fName names)) names) 
                                         \\ (getSameLevelFunction fName opt)

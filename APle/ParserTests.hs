@@ -103,12 +103,6 @@ parentheseTermTest = TestCase $
   (parseStringTerm opt "(3 <= 2) ") $
   Right $ TFun "<=" [TNum 3,TNum 2] 
 
--- Test for the given example give in Exam txt
-givenExampleTest = TestCase $
-  assertEqual "Test the given example in the exam text"
-  (parseStringTerm opt "3*(x+f(y,4)+z)") $
-  Right (TFun "*" [TNum 3,TFun "+" [TFun "+" [TVar "x",TFun "f" [TVar "y",TNum 4]],TVar "z"]])
-
 -- Tests for Cond
 test18 = TestCase $
   assertEqual "Test Cond with only one term"
@@ -165,20 +159,45 @@ test27 = TestCase $
   (parseStringCmds opt " 3 + 5 ?? 2 < 3 ?") $
   Right [CQuery (TFun "+" [TNum 3,TNum 5]) True,CQuery (TFun "<" [TNum 2,TNum 3]) False]
 
-test28 =  TestCase $
+
+  
+
+cmdTest = [test22, test23, test24, test25, test26, test27]
+
+-- Given Examples Tests
+-- Test for the given example give in Exam txt
+givenExampleTest1 = TestCase $
+  assertEqual "Test the given example in the exam text"
+  (parseStringTerm opt "3*(x+f(y,4)+z)") $
+  Right (TFun "*" [TNum 3,TFun "+" [TFun "+" [TVar "x",TFun "f" [TVar "y",TNum 4]],TVar "z"]])
+
+givenExampleTest2 =  TestCase $
   assertEqual "Test multiple Cmd"
   (parseStringCmds opt "D(x,t1*t2) = t1*D(x,t2) + t2*D(x,t1).") $
   Right [CRule (Rule (TFun "D" [TVar "x",TFun "*" [TVar "t1",TVar "t2"]]) 
   (TFun "+" [TFun "*" [TVar "t1",TFun "D" [TVar "x",TVar "t2"]],
   TFun "*" [TVar "t2",TFun "D" [TVar "x",TVar "t1"]]]) [])]
+
+givenExampleTest3 =  TestCase $
+  assertEqual "Test multiple Cmd"
+  (parseStringCmds opt "D(x,t1+t2) = D(x,t1) + D(x,t2).") $
+  Right [CRule (Rule (TFun "D" [TVar "x",TFun "+" [TVar "t1",TVar "t2"]]) 
+  (TFun "+" [TFun "D" [TVar "x",TVar "t1"],TFun "D" [TVar "x",TVar "t2"]]) [])]
+  
+givenExampleTest4 =  TestCase $
+  assertEqual "Test multiple Cmd"
+  (parseStringCmds opt "t1 * (t2 + t3) = t1 * t2 + t1 * t3.") $
+  Right [CRule (Rule (TFun "*" [TVar "t1",TFun "+" [TVar "t2",TVar "t3"]]) 
+  (TFun "+" [TFun "*" [TVar "t1",TVar "t2"],TFun "*" [TVar "t1",TVar "t3"]]) [])]
   
 
-cmdTest = [test22, test23, test24, test25, test26, test27, test28]
+givenExampleTest = [givenExampleTest1, givenExampleTest2, givenExampleTest3,
+                    givenExampleTest4]
 
--- Test for the Optation
 
+-- Combine All the Tests
 tests = test[numberTest ++ vfpNameTest ++ operatorTest ++ functionTermTest
-            ++ [parentheseTermTest, givenExampleTest] ++ condTest ++ rulTest
-            ++ cmdTest]
+            ++ [parentheseTermTest] ++ condTest ++ rulTest
+            ++ cmdTest ++ givenExampleTest]
 
 main = runTestTT tests
