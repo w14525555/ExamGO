@@ -26,6 +26,10 @@ instance Monad Global where
 instance Functor Global where fmap = liftM
 instance Applicative Global where pure = return; (<*>) = ap
 
+getRules :: Global [Rule]
+getRules = Global $ \r -> Right r
+
+-- A function to create a initial context for Global
 initialRules :: [Rule]
 initialRules = [ Rule (TFun "+" [TNum 0,TVar "t"]) (TVar "t") [],
                  Rule (TFun "+" [TVar "t",TNum 0]) (TVar "t") [],
@@ -33,9 +37,6 @@ initialRules = [ Rule (TFun "+" [TNum 0,TVar "t"]) (TVar "t") [],
                 (TFun "+" [TFun "+" [TVar "t1",TVar "t2"],TVar "t3"]) [],
                  Rule (TFun "+" [TVar "t",TVar "t"]) (TFun "*" [TNum 2,TVar "t"]) [],
                  Rule (TFun "*" [TNum 0,TVar "t"]) (TNum 0) []]
-
-getRules :: Global [Rule]
-getRules = Global $ \r -> Right r
 
 failS :: Global a
 failS = fail "Nothing"
@@ -54,11 +55,6 @@ tryS m1 m2 = case runGlobal m1 initialRules of
         Just v2 -> fail v2
     Just v1 -> fail v1
 
-testRunGlobal :: Global a -> Either (Maybe ErrMsg) a
-testRunGlobal m = case runGlobal m initialRules of
-  Right v -> Right v
-  Left s -> Left s 
-
 ---- Local monad and related functions
 
 type LEnv = [(VName, Term)]
@@ -71,16 +67,15 @@ instance Monad Local where
     do (result1, newState1) <- runLocal t e
        (result2, newState2) <- runLocal (f result1) newState1
        return (result2, newState2)
-  fail "Nothing" = Local $ \_ -> Global $ \_ -> Left Nothing
-  fail s = Local $ \_ -> Global $ \_ -> Left $ Just s
 
 instance Functor Local where fmap = liftM
 instance Applicative Local where pure = return; (<*>) = ap
 
+-- Convert global monads
 inc :: Global a -> Local a
-inc g = undefined
-
---  Global $ \_ -> Local $ \_ -> g
+inc g = Local $ \e -> Global $ \r -> case runGlobal g r of
+  Right v -> Right (v, e)
+  Left s -> Left s
 
 askVar :: VName -> Local Term
 askVar name = Local $ \e -> case findTerm name e of
@@ -91,14 +86,6 @@ tellVar :: VName -> Term -> Local ()
 tellVar name t = Local $ \e -> case findTerm name e of
   [] -> return ((), e ++ [(name, t)])
   [t2] -> if t == t2 then return ((), e) else failS
-
--- A function to create a initial context for Local
-initialLocalEnv :: LEnv
-initialLocalEnv = [("test", TNum 1)]
-
--- A function to unwrap the value insides the monds
-testRunLocal :: Local a -> Either (Maybe ErrMsg) (a, LEnv)
-testRunLocal m = testRunGlobal (runLocal m initialLocalEnv)
 
 -- A function to get the Value of a Variable
 -- If unbounded, return []
@@ -114,7 +101,7 @@ findTerm vname (n:ns) = (findTerm vname [n]) ++ (findTerm vname ns)
 -- We can find 
 matchTerm :: Term -> Term -> Local ()
 -- If they are same constants, they can match: t + 0 and p + 0
-matchTerm (TNum n1) (TNum n2) = if n1 == n2 then return () else fail "Nothing"
+matchTerm (TNum n1) (TNum n2) = if n1 == n2 then return () else inc failS
 matchTerm (TVar nameP) (TNum n2) = tellVar nameP (TNum n2)
 matchTerm (TVar nameP) (TFun fname2 ts) = tellVar nameP (TFun fname2 ts)
 --If it is a variable name then get the Term from env
@@ -123,15 +110,15 @@ matchTerm (TVar nameP) (TVar nameT) = do
   t <- askVar nameT
   tellVar nameP t
 matchTerm (TFun fname1 [])(TFun fname2 []) = 
-  if fname1 == fname2 then return () else fail "Nothing"
+  if fname1 == fname2 then return () else inc failS
 matchTerm (TFun fname1 ts1)(TFun fname2 ts2) =
   if fname1 == fname2
     then do result <- matchTerms ts1 ts2
             case result of
               [] -> return ()
-              _ -> fail "Nothing"
-    else fail "Nothing"
-matchTerm _ _ = fail "Nothing"
+              _ -> inc failS
+    else inc failS
+matchTerm _ _ = inc failS
 
 -- A function to handle the case of recusive terms
 -- If two term list has different length
@@ -161,10 +148,18 @@ instTerms (t:ts) = do
   ts1 <- instTerms ts
   return $ t1 ++ ts1
 
----- Conditions and rule aplication
-
+-- Conditions and rule aplication
+-- tellVar call failS if t3 is bounded but 
+-- binding to the value n1 + n2
 evalCond :: PName -> [Term] -> Global [Term]
-evalCond = undefined
+evalCond "num" [(TNum n)] = return [(TNum n)]
+evalCond "num" _ = failS
+evalCond "var" [(TVar v)] = return [(TVar v)]
+evalCond "var" _ = failS
+evalCond "add" [(TNum n1), (TNum n2), (TNum n3)] = 
+  if n1 + n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
+evalCond "add" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 + n2))]
+evalCond "add" _ = failS
 
 applyRule :: Rule -> Term -> Global Term
 applyRule = undefined
@@ -178,3 +173,17 @@ rewriteTerm = undefined
 
 processCmd :: Cmd -> GEnv -> (Rsp, GEnv)
 processCmd = undefined
+
+-- A function used unwrpped the value inside global monads
+-- testRunGlobal :: Global a -> Either (Maybe ErrMsg) a
+-- testRunGlobal m = case runGlobal m initialRules of
+--   Right v -> Right v
+--   Left s -> Left s
+
+-- -- A function to create a initial context for Local
+-- initialLocalEnv :: LEnv
+-- initialLocalEnv = [("test", TNum 1)]
+
+-- A function to unwrap the value insides the monds
+-- testRunLocal :: Local a -> Either (Maybe ErrMsg) (a, LEnv)
+-- testRunLocal m = testRunGlobal (runLocal m initialLocalEnv)
