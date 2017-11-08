@@ -98,15 +98,20 @@ findTerm vname (n:ns) = (findTerm vname [n]) ++ (findTerm vname ns)
 ---- Matching and instantiation
 
 -- To matchTerm 
--- We can find 
 matchTerm :: Term -> Term -> Local ()
--- If they are same constants, they can match: t + 0 and p + 0
+-- If they are same constants, they can match: 1 + 0 and 1 + 0
 matchTerm (TNum n1) (TNum n2) = if n1 == n2 then return () else inc failS
+-- if p is an avariable p + 0 and 3 + 0 
+-- And assign value 3 to p to finish the match
 matchTerm (TVar nameP) (TNum n2) = tellVar nameP (TNum n2)
-matchTerm (TVar nameP) (TFun fname2 ts) = tellVar nameP (TFun fname2 ts)
+-- if p is an avariable, it can aslo match as long as
+-- we can assign the function to p  
+matchTerm (TVar nameP) (TFun fname2 ts) = do
+  t <- instTerm $ TFun fname2 ts
+  tellVar nameP t
 --If it is a variable name then get the Term from env
 --And assign the new value 
-matchTerm (TVar nameP) (TVar nameT) = do 
+matchTerm (TVar nameP) (TVar nameT) = do
   t <- askVar nameT
   tellVar nameP t
 matchTerm (TFun fname1 [])(TFun fname2 []) = 
@@ -122,7 +127,7 @@ matchTerm _ _ = inc failS
 
 -- A function to handle the case of recusive terms
 -- If two term list has different length
--- they don't not match
+-- they don't match
 matchTerms :: [Term] -> [Term] -> Local [Term]
 matchTerms [t1] [t2] = do matchTerm t1 t2; return []
 matchTerms (t1:ts1) (t2:ts2) = do
@@ -160,6 +165,16 @@ evalCond "add" [(TNum n1), (TNum n2), (TNum n3)] =
   if n1 + n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
 evalCond "add" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 + n2))]
 evalCond "add" _ = failS
+evalCond "mul" [(TNum n1), (TNum n2), (TNum n3)] = 
+  if n1 * n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
+evalCond "mul" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 * n2))]
+evalCond "mul" _ = failS
+evalCond "lexless" [(TNum n1), (TNum n2)] =
+  if n1 < n2 then return [(TNum n1), (TNum n2)] else failS
+evalCond "lexless" [(TVar v1), (TVar v2)] = 
+  if v1 < v2 then return [(TVar v1), (TVar v2)] else failS
+evalCond "lexless" _ = failS
+evalCond p _ = failH $ "The predict " ++ p  ++ " is not defined"
 
 applyRule :: Rule -> Term -> Global Term
 applyRule = undefined

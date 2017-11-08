@@ -52,48 +52,126 @@ test4 = TestCase $
   (testRunLocal (matchTerm (TFun "ss" []) (TFun "s" [])))$
   (Left Nothing)
 
-localTest = [test2, test3, test4]
+test5 = TestCase $
+  assertEqual "Test match when P is an avariable and T is a Num will assign p with value of T"
+  (testRunLocal (matchTerm (TVar "name") (TNum 3)))$
+  (Right ((),[("test",TNum 1),("name",TNum 3)]))
+
+test6 = TestCase $
+  assertEqual "Test match when P is an avariable and T is a Function will assign p with value of T"
+  (testRunLocal (matchTerm (TVar "name") (TFun "plus" [(TNum 1), (TNum 2)])))$
+  (Right ((),[("test",TNum 1),("name",TFun "plus" [TNum 1,TNum 2])]))
+
+test7 = TestCase $
+  assertEqual "Test match two function t + 0 and 1 + 0"
+  (testRunLocal (matchTerm (TFun "plus" [(TVar "p"), (TNum 0)]) (TFun "plus" [(TNum 1), (TNum 0)])))$
+  (Right ((),[("test",TNum 1),("p",TNum 1)]))
+
+test8 = TestCase $
+  assertEqual "Test match two function t + 0 and (1 + 1) + 0"
+  (testRunLocal (matchTerm (TFun "plus" [(TVar "p"), (TNum 0)]) (TFun "plus" [(TFun "plus" [(TNum 1), (TNum 1)]), (TNum 0)])))$
+  (Right ((),[("test",TNum 1),("p",TFun "plus" [TNum 1,TNum 1])]))
+
+test9 = TestCase $
+  assertEqual "Test match two function t + 0 and (1 + p) + 0 where p is unbounded"
+  (testRunLocal (matchTerm (TFun "plus" [(TVar "p"), (TNum 0)]) (TFun "plus" [(TFun "plus" [(TVar "v"), (TNum 1)]), (TNum 0)])))$
+  (Left (Just "variable is unbound"))
+
+test10 = TestCase $
+  assertEqual "Test match two function t + 0 and (1 + p) + 0 where p is bounded"
+  (testRunLocal (matchTerm (TFun "plus" [(TVar "p"), (TNum 0)]) (TFun "plus" [(TFun "plus" [(TVar "test"), (TNum 1)]), (TNum 0)])))$
+  (Right ((),[("test",TNum 1),("p",TFun "plus" [TNum 1,TNum 1])]))
+
+matchTest = [test2, test3, test4, test5, test6, test7, 
+             test8, test9, test10]
 
 -- Eval Condition Tests
-test5 = TestCase $
+-- num
+test11 = TestCase $
   assertEqual "Test evalCond num with Num Term returns right value"
   (testRunGlobal (evalCond "num" [(TNum 1)]))$
   (Right [TNum 1])
 
-test6 = TestCase $
+test12 = TestCase $
   assertEqual "Test evalCond num with a Var returns soft failure"
   (testRunGlobal (evalCond "num" [(TVar "name")]))$
   (Left Nothing)
 
-test7 = TestCase $
+-- var
+test13 = TestCase $
   assertEqual "Test evalCond var with a var Term returns right value"
   (testRunGlobal (evalCond "var" [(TVar "name")]))$
   (Right [TVar "name"])
 
-test8 = TestCase $
+test14 = TestCase $
   assertEqual "Test evalCond var with a Num returns soft failure"
   (testRunGlobal (evalCond "var" [(TNum 1)]))$
   (Left Nothing)
 
-test9 = TestCase $
+-- add
+test15 = TestCase $
   assertEqual "Test evalCond add success if n1 + n2 = n3"
   (testRunGlobal (evalCond "add" [(TNum 1), (TNum 2), (TNum 3)]))$
   (Right [TNum 1,TNum 2,TNum 3])
 
-test10 = TestCase $
+test16 = TestCase $
   assertEqual "Test evalCond add returns the sum of n1 + n2"
   (testRunGlobal (evalCond "add" [(TNum 5), (TNum 3), (TVar "name")]))$
   (Right [TNum 5,TNum 3,TNum 8])
 
-test11 = TestCase $
+test17 = TestCase $
   assertEqual "Test evalCond add returns soft fails if n1 + n2 /= n3"
   (testRunGlobal (evalCond "add" [(TNum 5), (TNum 3), (TNum 3)]))$
   (Left Nothing)
 
-evalCondTest = [test5, test6, test7, test8, test9, test10, test11]
+test18 = TestCase $
+  assertEqual "Test evalCond add returns soft fails if type is not valid"
+  (testRunGlobal (evalCond "add" [(TNum 5), (TVar "name"), (TNum 3)]))$
+  (Left Nothing)
+
+-- mul
+test19 = TestCase $
+  assertEqual "Test evalCond mul returns the product of n1 * n2"
+  (testRunGlobal (evalCond "mul" [(TNum 5), (TNum 3), (TVar "name")]))$
+  (Right [TNum 5,TNum 3,TNum 15])
+
+test20 = TestCase $
+  assertEqual "Test evalCond mul returns soft fails if n1 * n2 /= n3"
+  (testRunGlobal (evalCond "mul" [(TNum 5), (TNum 3), (TNum 3)]))$
+  (Left Nothing)
+
+test21 = TestCase $
+  assertEqual "Test evalCond mul returns soft fails if type is not valid"
+  (testRunGlobal (evalCond "mul" [(TNum 5), (TVar "name"), (TNum 3)]))$
+  (Left Nothing)
+
+-- lexless
+test22 = TestCase $
+  assertEqual "Test evalCond lexless returns [Term] on Num n1 < Num n2"
+  (testRunGlobal (evalCond "lexless" [(TNum 3), (TNum 5)]))$
+  (Right [TNum 3,TNum 5])
+
+test23 = TestCase $
+  assertEqual "Test evalCond lexless returns [Term] on Var a < Var b"
+  (testRunGlobal (evalCond "lexless" [(TVar "apple"), (TVar "name")]))$
+  (Right [(TVar "apple"), (TVar "name")])
+
+test24 = TestCase $
+  assertEqual "Test evalCond lexless returns soft error on other cases"
+  (testRunGlobal (evalCond "lexless" [(TNum 5), (TVar "name")]))$
+  (Left Nothing)
+
+-- Undeinded Predicte
+test25 = TestCase $
+  assertEqual "Test evalCond return hardware error if the predicate is not defined"
+  (testRunGlobal (evalCond "hi" [(TNum 5), (TVar "name")]))$
+  (Left (Just "The predict hi is not defined"))
+
+evalCondTest = [test11, test12, test13, test14, test15, test16, test17, test18
+                , test19, test20, test21, test22, test23, test24, test25]
 
 -- Combine All the Tests
-tests = test[globalTest ++ localTest ++ evalCondTest]
+tests = test[globalTest ++ matchTest ++ evalCondTest]
 
 
 main = runTestTT tests
