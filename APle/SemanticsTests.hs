@@ -2,10 +2,6 @@ import Test.HUnit
 import SemanticsImpl
 import AST
 
--- A function to create a initial context for Local
-initialLocalEnv :: LEnv
-initialLocalEnv = [("test", TNum 1)]
-
 -- A function to unwrap the value insides local monds
 testRunLocal :: Local a -> Either (Maybe ErrMsg) (a, LEnv)
 testRunLocal m = testRunGlobal (runLocal m initialLocalEnv)
@@ -168,10 +164,71 @@ test25 = TestCase $
   (Left (Just "The predict hi is not defined"))
 
 evalCondTest = [test11, test12, test13, test14, test15, test16, test17, test18
-                , test19, test20, test21, test22, test23, test24, test25]
+                ,test19, test20, test21, test22, test23, test24, test25]
+
+-- Tests for apply Rule
+-- t + 0 = t
+plusZeroRule :: Rule
+plusZeroRule = Rule (TFun "+" [TVar "t",TNum 0]) (TVar "t") []
+
+-- t + t = 2 * t
+doubleRule :: Rule
+doubleRule = Rule (TFun "+" [TVar "t",TVar "t"]) (TFun "*" [TNum 2,TVar "t"]) []
+
+-- -- A function to create a initial context for Local
+-- initialLocalEnv :: LEnv
+-- initialLocalEnv = [("test", TNum 1)]
+
+test26 = TestCase $
+  assertEqual "Test apply rule (t + 0 = t) work on a simple rule with 3 + 0"
+  (testRunGlobal (applyRule plusZeroRule (TFun "+" [TNum 3,TNum 0])))$
+  (Right (TNum 3))
+
+test27 = TestCase $
+  assertEqual "Test apply rule (t + 0 = t) work on a simple rule with v + 0"
+  (testRunGlobal (applyRule plusZeroRule (TFun "+" [TVar "test",TNum 0])))$
+  (Right (TNum 1))
+
+test28 = TestCase $
+  assertEqual "Test apply rule (t + t = 2 * t) work on a simple rule with 2 + 2"
+  (testRunGlobal (applyRule doubleRule (TFun "+" [TNum 2,TNum 2])))$
+  (Right (TFun "*" [TNum 2,TNum 2]))  
+
+test29 = TestCase $
+  assertEqual "Test apply rule (t + t = 2 * t) work on a simple rule with v + v (v = 1)"
+  (testRunGlobal (applyRule doubleRule (TFun "+" [TNum 1,TNum 1])))$
+  (Right (TFun "*" [TNum 2,TNum 1]))
+
+-- Test apply rules with condition
+
+-- t + 0 = t | num(t)
+plusZeroRuleWithCond :: Rule
+plusZeroRuleWithCond = Rule (TFun "+" [TVar "t",TNum 0]) (TVar "t") [Cond "num" [TVar "t"][]]
+
+sumRuleWithCond :: Rule
+sumRuleWithCond = Rule (TFun "+" [TVar "n1",TVar "n2"]) (TVar "n3") [Cond "num" [TVar "n1"] [],
+                        Cond "num" [TVar "n2"] [],Cond "add" [TVar "n1",TVar "n2"] [TVar "n3"]]
+sumRule :: Rule
+sumRule = Rule (TFun "+" [TVar "n1",TVar "n2"]) (TVar "n3") []
+ 
+test30 = TestCase $
+  assertEqual "Test apply rule (t + 0 = t)| num(t) with condition num 3 with 3 + 0"
+  (testRunGlobal (applyRule plusZeroRuleWithCond (TFun "+" [TNum 3,TNum 0])))$
+  (Right (TNum 3))
+
+test31 = TestCase $
+  assertEqual "Test apply rule (t + 0 = t) num(t) work on a simple rule with v + 0"
+  (testRunGlobal (applyRule plusZeroRuleWithCond (TFun "+" [TVar "test",TNum 0])))$
+  (Right (TNum 1))
+
+test32 = TestCase $
+  assertEqual "Test apply rule (n1 + n2 = n3) | num(n1), num(n2), add(n1,n2;n3) work"
+  (testRunGlobal (applyRule sumRuleWithCond (TFun "+" [TNum 2,TNum 3])))$
+  (Right (TNum 5))
+
+applyRuleTest = [test26, test27, test28, test29, test30, test31, test32]
 
 -- Combine All the Tests
-tests = test[globalTest ++ matchTest ++ evalCondTest]
-
+tests = test[globalTest ++ matchTest ++ evalCondTest ++ applyRuleTest]
 
 main = runTestTT tests

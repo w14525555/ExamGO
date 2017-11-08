@@ -71,6 +71,10 @@ instance Monad Local where
 instance Functor Local where fmap = liftM
 instance Applicative Local where pure = return; (<*>) = ap
 
+-- A function to create a initial context for Local
+initialLocalEnv :: LEnv
+initialLocalEnv = [("test", TNum 1)]
+
 -- Convert global monads
 inc :: Global a -> Local a
 inc g = Local $ \e -> Global $ \r -> case runGlobal g r of
@@ -79,7 +83,7 @@ inc g = Local $ \e -> Global $ \r -> case runGlobal g r of
 
 askVar :: VName -> Local Term
 askVar name = Local $ \e -> case findTerm name e of
-  [] -> failH "variable is unbound"
+  [] -> failH $ "variable " ++ name ++" is unbound"
   [t] -> return (t, e)
 
 tellVar :: VName -> Term -> Local ()
@@ -134,7 +138,7 @@ matchTerms (t1:ts1) (t2:ts2) = do
   t <- matchTerms [t1] [t2]
   ts <- matchTerms ts1 ts2
   return $ t ++ ts
-matchTerms _ _ = fail "Nothing"
+matchTerms _ _ = inc failS
 
 instTerm :: Term -> Local Term
 instTerm (TVar vname) = askVar vname
@@ -145,6 +149,7 @@ instTerm (TFun fname ts) = do
   return $ TFun fname newTs
 
 instTerms :: [Term] -> Local [Term]
+instTerms [] = return []
 instTerms [t] = do
   t1 <- instTerm t
   return [t1]
@@ -176,8 +181,31 @@ evalCond "lexless" [(TVar v1), (TVar v2)] =
 evalCond "lexless" _ = failS
 evalCond p _ = failH $ "The predict " ++ p  ++ " is not defined"
 
+-- Use runlocal to convert local to global
+-- we can get a new LEnv from runLocal matchTerm
+-- use it to instTerm
 applyRule :: Rule -> Term -> Global Term
-applyRule = undefined
+applyRule (Rule t1 t2 []) t3 = do
+  (_, e) <- runLocal (matchTerm t1 t3) initialLocalEnv
+  (t, _) <- runLocal (instTerm t2) e
+  return t
+applyRule (Rule t1 t2 conds) t3 = do
+  (_, e) <- runLocal (matchTerm t1 t3) initialLocalEnv
+  _ <- checkConds conds e
+  (t, _) <- runLocal (instTerm t2) e
+  return t
+
+-- A function used to check conditions
+-- It will firstly init the Terms in the
+-- The conditional rule then do the evaluation
+checkConds :: [Cond] -> LEnv -> Global [Term]
+checkConds [(Cond pName ts1 ts2)] e = do
+  (newTs1, _) <- runLocal (instTerms ts1) e
+  evalCond pName (newTs1 ++ ts2)
+checkConds (c:cs) e = do
+  r <- checkConds [c] e
+  rs <- checkConds cs e
+  return $ r ++ rs
 
 ---- Single-step term rewriting
 
