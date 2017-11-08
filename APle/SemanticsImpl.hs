@@ -163,22 +163,22 @@ instTerms (t:ts) = do
 -- binding to the value n1 + n2
 evalCond :: PName -> [Term] -> Global [Term]
 evalCond "num" [(TNum n)] = return [(TNum n)]
-evalCond "num" _ = failS
+evalCond "num" _ = failH $ "evalCond with illegal Arguments"
 evalCond "var" [(TVar v)] = return [(TVar v)]
-evalCond "var" _ = failS
+evalCond "var" _ = failH $ "evalCond with illegal Arguments"
 evalCond "add" [(TNum n1), (TNum n2), (TNum n3)] = 
   if n1 + n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
 evalCond "add" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 + n2))]
-evalCond "add" _ = failS
+evalCond "add" _ = failH $ "evalCond with illegal Arguments"
 evalCond "mul" [(TNum n1), (TNum n2), (TNum n3)] = 
   if n1 * n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
 evalCond "mul" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 * n2))]
-evalCond "mul" _ = failS
+evalCond "mul" _ = failH $ "evalCond with illegal Arguments"
 evalCond "lexless" [(TNum n1), (TNum n2)] =
   if n1 < n2 then return [(TNum n1), (TNum n2)] else failS
 evalCond "lexless" [(TVar v1), (TVar v2)] = 
   if v1 < v2 then return [(TVar v1), (TVar v2)] else failS
-evalCond "lexless" _ = failS
+evalCond "lexless" _ = failH $ "evalCond with illegal Arguments"
 evalCond p _ = failH $ "The predict " ++ p  ++ " is not defined"
 
 -- Use runlocal to convert local to global
@@ -191,8 +191,9 @@ applyRule (Rule t1 t2 []) t3 = do
   return t
 applyRule (Rule t1 t2 conds) t3 = do
   (_, e) <- runLocal (matchTerm t1 t3) initialLocalEnv
-  _ <- checkConds conds e
-  (t, _) <- runLocal (instTerm t2) e
+  newTs <- checkConds conds e
+  (_, newE) <- runLocal (assignConds conds newTs) e
+  (t, _) <- runLocal (instTerm t2) newE
   return t
 
 -- A function used to check conditions
@@ -207,10 +208,25 @@ checkConds (c:cs) e = do
   rs <- checkConds cs e
   return $ r ++ rs
 
----- Single-step term rewriting
+-- A function to assign the evaluate result to the RHS
+-- For instance 3 + 4 = y
+-- When we evalCon we get 3 + 4 = 7
+-- Then we match the list 
+-- THe match function will assign y with 7
+assignConds :: [Cond] -> [Term] -> Local [Term]
+assignConds conds ts = matchTerms (getTermsFromConds conds) ts
 
+-- A function to get all the [Item] in the condition list
+getTermsFromConds :: [Cond] -> [Term]
+getTermsFromConds [(Cond pName ts1 ts2)] = ts1 ++ ts2
+getTermsFromConds (c:cs) = (getTermsFromConds [c]) ++ (getTermsFromConds cs)
+
+---- Single-step term rewriting
 rewriteTerm :: Term -> Global Term
-rewriteTerm = undefined
+rewriteTerm t = undefined
+
+-- findRuleForTerm :: Term -> Rule
+-- findRuleForTerm = undefined
 
 ---- Top-level interaction
 

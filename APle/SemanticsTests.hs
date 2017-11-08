@@ -69,9 +69,9 @@ test8 = TestCase $
   (Right ((),[("test",TNum 1),("p",TFun "plus" [TNum 1,TNum 1])]))
 
 test9 = TestCase $
-  assertEqual "Test match two function t + 0 and (1 + p) + 0 where p is unbounded"
+  assertEqual "Test match two function t + 0 and (1 + p) + 0 where p is unbound"
   (testRunLocal (matchTerm (TFun "plus" [(TVar "p"), (TNum 0)]) (TFun "plus" [(TFun "plus" [(TVar "v"), (TNum 1)]), (TNum 0)])))$
-  (Left (Just "variable is unbound"))
+  (Left (Just "variable v is unbound"))
 
 test10 = TestCase $
   assertEqual "Test match two function t + 0 and (1 + p) + 0 where p is bounded"
@@ -91,7 +91,7 @@ test11 = TestCase $
 test12 = TestCase $
   assertEqual "Test evalCond num with a Var returns soft failure"
   (testRunGlobal (evalCond "num" [(TVar "name")]))$
-  (Left Nothing)
+  (Left (Just "evalCond with illegal Arguments"))
 
 -- var
 test13 = TestCase $
@@ -102,7 +102,7 @@ test13 = TestCase $
 test14 = TestCase $
   assertEqual "Test evalCond var with a Num returns soft failure"
   (testRunGlobal (evalCond "var" [(TNum 1)]))$
-  (Left Nothing)
+  (Left (Just "evalCond with illegal Arguments"))
 
 -- add
 test15 = TestCase $
@@ -123,7 +123,7 @@ test17 = TestCase $
 test18 = TestCase $
   assertEqual "Test evalCond add returns soft fails if type is not valid"
   (testRunGlobal (evalCond "add" [(TNum 5), (TVar "name"), (TNum 3)]))$
-  (Left Nothing)
+  (Left (Just "evalCond with illegal Arguments"))
 
 -- mul
 test19 = TestCase $
@@ -139,7 +139,7 @@ test20 = TestCase $
 test21 = TestCase $
   assertEqual "Test evalCond mul returns soft fails if type is not valid"
   (testRunGlobal (evalCond "mul" [(TNum 5), (TVar "name"), (TNum 3)]))$
-  (Left Nothing)
+  (Left (Just "evalCond with illegal Arguments"))
 
 -- lexless
 test22 = TestCase $
@@ -155,7 +155,7 @@ test23 = TestCase $
 test24 = TestCase $
   assertEqual "Test evalCond lexless returns soft error on other cases"
   (testRunGlobal (evalCond "lexless" [(TNum 5), (TVar "name")]))$
-  (Left Nothing)
+  (Left (Just "evalCond with illegal Arguments"))
 
 -- Undeinded Predicte
 test25 = TestCase $
