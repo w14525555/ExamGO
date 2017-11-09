@@ -66,7 +66,6 @@ getNextFunName [] = []
 getNextFunName [t] = [t]
 getNextFunName (t:ts) = [t]
 
-
 -- A function to get all higher operations in the Optable
 getSameLevelFunction :: FName -> OpTable -> [FName]
 getSameLevelFunction fName (OpTable [(_, names)]) = if fName `elem` names then names else []

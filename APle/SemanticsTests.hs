@@ -23,11 +23,6 @@ test1 = TestCase $
   Rule (TFun "+" [TVar "t",TVar "t"]) (TFun "*" [TNum 2,TVar "t"]) [],
   Rule (TFun "*" [TNum 0,TVar "t"]) (TNum 0) []]
 
--- test3 = TestCase $
---   assertEqual "Test failH returns Left Just errorMsg"
---   (testRunGlobal (failH "fail test")) $
---   Left $ Just "fail test"
-
 globalTest = [test1]
 
 -- Local Tests

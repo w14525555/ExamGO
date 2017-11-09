@@ -1,0 +1,370 @@
+\documentclass[11pt]{article}
+\usepackage{listings}
+\usepackage{color}
+ \usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+ 
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,
+    language=haskell,               
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+ 
+\lstset{style=mystyle}
+\begin{document}
+\title{Advanced Programming Exam Report}
+\author{You Wu(rmq350)}
+\maketitle
+
+\section{Introduction}
+
+I think I have completed about the 85\% the exam, including all the required API functions and tests. I think they are still far from perfect, but if there are no big design mistakes, then the estimation should be correct. It is a tough exam because I have spent about 70 hours on it but I still cannot finish all the questions. 
+
+\begin{enumerate}
+\item \textbf{Parser} is implemented in full including all the functions, Unit Tests, and Quick Check Tests(Name, Number and Term).
+
+\item \textbf{Pretty Printer} is implemented in full except the Quick Check tests.  
+
+\item \textbf{Interpreter} is implemented in partial but all the required functions should be implemented with a lot of Unit Tests except \textit{rewriteTerm} and \textit{processCmd}. 
+
+\item \textbf{Erlang} is implemented in full including main program, demo and Unit Tests except the Quick Check Tests.
+
+\end{enumerate}
+
+These information are just my estimation of my work and estimation is always hard to be correct, but hopefully this could save you some time for grading this assignment.
+
+\section{Syntax of APle}
+
+\subsection{Parsing}
+
+\begin{enumerate}
+\item \textbf{Challenge}. The greatest challenge of parser is apply the Optable to the parser. As recommended, firstly I implemented a hard-code parser with a lot of Unit Tests and then try to use the Optable. After the hard-code is implemented, I found it is actually not that hard. Just extend the \textit{chainl1} or \textit{chainr1} function the problem could be simply solved.
+
+\item \textbf{Grammar}. The grammar does not have much to rewrite, the only part we need rewrite is 
+
+\begin{verbatim}
+Term ::= Term oper Term
+\end{verbatim}
+
+And it is determined by the \textbf{Optable}. As we know, we can do the left recursion elimination to remove the recursion and apply the \textit{chainl1} or \textit{chainr1} function to make grammar more compact. Therefore, the new grammar is:
+
+\begin{verbatim}
+Term :: = Term topOpr1 Term1 | Term topOpr2 Term1 | ....| Term1
+Term1 := Term1 secondOpr1 Term2 | Term1 secondOpr2 Term2 | ...| Term2
+...
+TermN:: = TermN lastOpr1 BottomTerm |TermN lastOpr2 BottomTerm| ....| BottomTerm 
+\end{verbatim} 
+
+The bottom terms are \textit{vname, number, fname, (Term)}
+\item \textbf{Core Implementation}
+
+\begin{lstlisting}
+-- Parse Term
+parseOptTerm :: OpTable -> OpTable -> ReadP Term
+parseOptTerm (OpTable [o]) opt = parseOptItem o opt
+parseOptTerm (OpTable ((FNone, fnames):os)) opt = do
+    chainl1 (parseOptTerm (OpTable os) opt) (combineOperations fnames)
+parseOptTerm (OpTable ((FLeft, fnames):os)) opt = do
+    chainl1 (parseOptTerm (OpTable os) opt) (combineOperations fnames)
+parseOptTerm (OpTable ((FRight, fnames):os)) opt = do
+    chainr1 (parseOptTerm (OpTable os) opt) (combineOperations fnames)
+
+parseOptItem :: OpTableElement -> OpTable -> ReadP Term
+parseOptItem (FNone, names) opt = parseOptableNoneOrLeft names opt
+parseOptItem (FLeft, names) opt = parseOptableNoneOrLeft names opt
+parseOptItem (FRight, names) opt = parseOptableRight names opt
+
+-- Handle the case of Fixity = FLeft | FNone
+parseOptableNoneOrLeft :: [FName] -> OpTable -> ReadP Term
+parseOptableNoneOrLeft fnames opt = do 
+    chainl1 (parseBottomTerms opt) (combineOperations fnames)
+
+\end{lstlisting}
+
+Here I use two \textit{Optable}. The second one is use by the bottom terms because the expressions of \textit{fname ( TermZ )} and \textit{( Term )} also need a optable. And it took me some time to figure it out.
+
+I mainly use Pattern Match and recursion to solve this problem. It matches the \textit{FNONE, FLEFT, FRIGHT} to determine we use association of the operators. \textbf{Here I assume we can use LEFT association as default association of FNONE}.
+
+
+\item \textbf{Unit Tests}.
+I write 32 Unit Tests for the parser to ensure the correctness. The structure is from bottom(Item) to top(Cmds). It should test most of situations and conditions in the grammar. The last four tests are given example in the assignment text such as "$$D(x,t1*t2) = t1*D(x,t2) + t2*D(x,t1).$$" 
+
+\textbf{Run Unit Tests}
+Here I write a \textit{main} function for the Unit Test. Therefore, the tests are runnable as:
+\begin{verbatim}
+runHaskell ParserTests
+\end{verbatim}
+
+\end{enumerate}
+
+\subsection{Pretty Printing}
+
+\begin{enumerate}
+\item \textbf{Challenge}. The main challenge of the printer is determining when we need parentheses and when it is not necessary. It took me several hours to figure it out. The Function Term has a list terms. There are several cases: if the function is not in the Optable, then we need a parentheses to indicate it is a function. If the function is in the Optable, then we need parentheses if and only if the the next function name in the term list (TFun fname [Term]) has higher level precedence operators.(For instance, '+' is higher then '*', then 5 * (3 + 3) needs parentheses but 5 * 3 / 3 does not have to). Therefore, the main problem is solved. 
+
+\item \textbf{Implementation}
+\begin{lstlisting}
+-- To check if need parenthese We shoudld 
+-- check if there is higher operation in Term list
+-- If the higher function contain the next fun name in 
+-- The list of Terms, there should be parenthese
+needParenthese :: FName -> [Term] -> OpTable -> Bool
+needParenthese fName ts opt = length higherfunctions /= length (higherfunctions \\ (getNextFunName (getFunctionNameFromTerms ts)))
+    where higherfunctions = getHigherLevelFunction fName (getNameList opt) opt
+
+-- A function a get all funName in [Term]
+getFunctionNameFromTerms :: [Term] -> [FName]
+getFunctionNameFromTerms [t] = convertTermToFName t
+getFunctionNameFromTerms (t:ts) = (getFunctionNameFromTerms [t]) ++ (getFunctionNameFromTerms ts)
+
+convertTermToFName :: Term -> [FName]
+convertTermToFName (TVar v) = []
+convertTermToFName (TNum i) = []
+convertTermToFName (TFun fName ts) = [fName] ++ (getFunctionNameFromTerms ts)
+
+getNextFunName :: [FName] -> [FName]
+getNextFunName [] = []
+getNextFunName [t] = [t]
+getNextFunName (t:ts) = [t]
+
+
+-- A function to get all higher operations in the Optable
+getSameLevelFunction :: FName -> OpTable -> [FName]
+getSameLevelFunction fName (OpTable [(_, names)]) = if fName `elem` names then names else []
+getSameLevelFunction fName (OpTable (n:ns)) = (getSameLevelFunction fName (OpTable [n])) 
+                                            ++ (getSameLevelFunction fName (OpTable ns)) 
+
+-- A function to get higher level function names in the Optable 
+getHigherLevelFunction :: FName -> [FName] -> OpTable -> [FName]
+getHigherLevelFunction fName names opt = (take (fromJust (elemIndex fName names)) names) 
+                                        \\ (getSameLevelFunction fName opt)
+\end{lstlisting}
+
+The way of implementation looks a little complicated but the logic should be clear. Here are some steps:
+\begin{itemize}
+\item Write a function to get all higher level functions in the Optable
+\item Write a another function to get the next the Function Name in the Term list. 
+\item If the next function name is in the higher function list, we need add parentheses. If not, we don't.  
+\end{itemize}
+
+\item \textbf{Other} parts are just patten match and convert term to string. 
+
+\end{enumerate}
+
+\subsection{QuickChecking the syntax handling}
+
+\begin{enumerate}
+\item \textbf{Quick Check For Parser}
+
+Here I write 3 Quick Check Tests for the parser: 
+
+1. parse a generated Name \newline
+2. Parse a generated number \newline
+3. Parse a generated term. 
+
+Generate a string and number is relative easier. The main challenge is how to generate a random Term. Here I write instance for \textit{Arbitrary Term} and it can be \textit{oneof} Name, Number of Function. 
+
+\item \textbf{Core Implementation}
+
+\begin{lstlisting}
+instance Arbitrary Term where
+    arbitrary = oneof [genTermString, genTermNumbers, genTermFunction]
+
+genNumbers :: Gen Integer
+genNumbers = choose (-999999999999999999, 999999999999999999)
+
+genTermNumbers :: Gen Term
+genTermNumbers = do
+    ns <- genNumbers
+    return $ TNum ns
+
+genTermString :: Gen Term
+genTermString = do
+    c <- genChar
+    cs <- genSyntaxString
+    return $ TVar $ c ++ cs
+
+genTermFunction :: Gen Term
+genTermFunction = do
+    c <- genChar
+    cs <- genSyntaxString
+    ts <- oneof [genTermString, genTermNumbers, genTermFunction, genFunctionWithEmptyTermList]
+    return $ TFun (c++cs) [ts]
+
+genFunctionWithEmptyTermList :: Gen Term
+genFunctionWithEmptyTermList = do
+    c <- genChar
+    cs <- genSyntaxString
+    return $ TFun (c++cs) []
+\end{lstlisting}
+
+The difficult part is to generate a list of Terms in the TFun term. Here I use \textit{oneof} to generate the random item list. Since the item list can be empty, so here I have a function \textit{genFunctionWithEmptyTermList} to generate a function term with a empty list. 
+ 
+\item \textbf{Quick Check for Pretty Printer}
+
+In fact, I have a good idea here. I can write Pretty String Generator and a converter function to convert the pretty string to Item, and then check if the printTerm would print the string back. Unfortunately, I am running out of time. 
+
+\end{enumerate}
+
+
+\section{A rewriting engine for APle}
+
+\begin{enumerate}
+\item \textbf{Challenge}. The Interpreter has many challenges: The implementation of global and local monads, the switches between local and global environment, how to match terms and eval conditional rules, and apply the rules. 
+
+\item \textbf{Apply Rule}. The biggest challenge I have solved in this program. The most difficult is to handle the case of:
+$$n1 + n2 = n3$$
+Since in the step of \textit{matchTerm}, we assign values of LHS and in the \textit{evalCond}, we actually do not access or modify the local environment, so I thought $n3$ is always unbound. However, in the discussion board, I got the hint that this must happen else where. Therefore, I come up with idea this should happen after LHS and \textit{evalCond} and before \textit{RHS}. Then I noticed \textit{evalCond} returns a list of \textit{Term} which contains the value of RHS. Then I use the \textit{Term} list and match it with RHS and got a new environment. Finally use the new environment to \textit{instTerm} on the RHS, and it works.
+
+\begin{lstlisting}
+-- Use runlocal to convert local to global
+-- we can get a new LEnv from runLocal matchTerm
+-- use it to instTerm
+applyRule :: Rule -> Term -> Global Term
+applyRule (Rule t1 t2 []) t3 = do
+  (_, e) <- runLocal (matchTerm t1 t3) initialLocalEnv
+  (t, _) <- runLocal (instTerm t2) e
+  return t
+applyRule (Rule t1 t2 conds) t3 = do
+  (_, e) <- runLocal (matchTerm t1 t3) initialLocalEnv
+  newTs <- checkConds conds e
+  (_, newE) <- runLocal (assignConds conds newTs) e
+  (t, _) <- runLocal (instTerm t2) newE
+  return t
+
+-- A function used to check conditions
+-- It will firstly init the Terms in the
+-- The conditional rule then do the evaluation
+checkConds :: [Cond] -> LEnv -> Global [Term]
+checkConds [(Cond pName ts1 ts2)] e = do
+  (newTs1, _) <- runLocal (instTerms ts1) e
+  evalCond pName (newTs1 ++ ts2)
+checkConds (c:cs) e = do
+  r <- checkConds [c] e
+  rs <- checkConds cs e
+  return $ r ++ rs
+
+-- A function to assign the evaluate result to the RHS
+-- For instance 3 + 4 = y
+-- When we evalCon we get 3 + 4 = 7
+-- Then we match the list 
+-- THe match function will assign y with 7
+assignConds :: [Cond] -> [Term] -> Local [Term]
+assignConds conds ts = matchTerms (getTermsFromConds conds) ts
+
+-- A function to get all the [Item] in the condition list
+getTermsFromConds :: [Cond] -> [Term]
+getTermsFromConds [(Cond pName ts1 ts2)] = ts1 ++ ts2
+getTermsFromConds (c:cs) = (getTermsFromConds [c]) ++ (getTermsFromConds cs)
+\end{lstlisting}
+
+\item \textbf{Global and Local Monads}
+
+I was not familiar with local monads so it take longer time to figure it out. The global monads is simple, because it is just a simple version of monads without state. The local monads take me more time to implement, because of the return value is a Global Moands computation type. After I finished it, it is same as what we did in the assignment except that we need a Global Monads constructor. 
+
+\item \textbf{MatchTerm}
+
+The main challenge of \textit{matchTerm} is matching many conditions. In fact, it is very hard to understand the concept of how we matching terms. Then I find simpler solution: use the tiny rules to match to see what happens, which actually solves my problem. I found that if they are both numbers, they must be strictly equal to be matched. If P is a variable, we can assign the other matching term to the variable as long as it doesn't have unbound values, which means if it is a function, we have to try to instTerm to make sure there is no unbound values.  
+
+\item \textbf{Other functions such as inc, askVar, tellVar, tryS} are relative easier then the functions above. \textit{askVar} get access to the local environment and find the value by name. \textit{tellVar} modify the local environment and extend the local environment. \textit{Inc} use both of local and global constructors to run the global as the special case of local computation. \textit{tryS} just uses some cases of to check the return value of a computation. 
+
+\item \textbf{Some ideas about rewriteTerm}
+
+For the implementation of rewriteTerm, we can use look over the list of Rule and \textit{applyRule} to the item. Use \textit{case of} to find if it match or not.  If matches, we can add the result to list. Therefore, if  several rules match, we choose the first one (Rule selection at same position). If no match, then we go into the subRule, and do the same action. Since we apply the rule from outside to inside, the outermost is fulfilled. Since we apply the rule from left to right, the leftmost is fulfilled. Therefore, all the rule selections are fulfilled. I think this function actually is easier than \textit{applyRule}, but I just run out of time. 
+
+\item \textbf{Unit Tests}
+
+I have written 32 Unit Tests for the interpreter. I write a unwrap function to print the result:
+\begin{lstlisting}
+-- A function to unwrap the value insides local monds
+testRunLocal :: Local a -> Either (Maybe ErrMsg) (a, LEnv)
+testRunLocal m = testRunGlobal (runLocal m initialLocalEnv)
+
+-- A function used unwrpped the value inside global monads
+testRunGlobal :: Global a -> Either (Maybe ErrMsg) a
+testRunGlobal m = case runGlobal m initialRules of
+  Right v -> Right v
+  Left s -> Left s
+\end{lstlisting}
+ 
+Then I can use these two functions to test all the functions. I mainly focusing on the testing for \textit{matchTerm, evalCond, applyRule}.  They have so many cases and lots of conditions for testing.
+
+\item \textbf{Run Unit Tests}
+
+ Here I write a \textit{main} function for the Unit Test. Therefore, the tests are runnable as:
+\begin{verbatim}
+runHaskell SemanticsTests
+\end{verbatim}
+\end{enumerate}
+
+\section{RoboTA}
+
+\begin{enumerate}
+\item \textbf{Design Choice}
+
+\begin{itemize}
+\item \textbf{gen\_server}
+
+Use \textit{gen\_server} behaviour to implement the robota server. Erlang OPT is really great. In the behaviour of \textit{gen\_server}, we can \textit{handle\_call} for blocking function and \textit{handle\_cast} for non-blocking method. It also save the state of server so we don't have a loop manually and has well-defined error handling functions. 
+
+\item \textbf{Robustness} 
+
+Use \textit{start\_link} in the \textit{gen\_server} and this ensures the process of server is linked to the supervisor.
+
+Besides, when the server receives a submission and do the grading, it will spawn a new process as the manager of the grading and then after grading, the manager send the result to the right place.
+
+Both of the link and concurrency ensure the robustness of the server.
+
+\item \textbf{Minimising the latency}
+
+Although the method of grading is blocking(because grade() returns Ref quickly), the grading of one submission will not block the grading of other submissions, as I told above, the server will spawn a new process as the manager of the grading and the server just returns the Ref to the Pid. The manager handle the grading or maybe spawn new process to handle concurrency module. This is implemented by a simple function: spawn/3, which spawns a new process and take a function run the function. I just write the grading logic in this function but the grading will not include or block the server.  
+ 
+\end{itemize}
+
+\item \textbf{Core Implementation}
+
+Since my implementation has more than 500 lines of code, I write lots of comments around the code to make the implementation clear, but it also grows the code. So I think I should explain my implementation for every functions.
+
+\begin{itemize}
+\item \textbf{get\_the\_show\_started} 
+
+A simple function, here I just use \textit{start\_link} in gen\_server.
+
+\item \textbf{new(RoboTA, Name)}
+
+A function to create new assignment. Here I make the name unique because in the function grade, we the Name to find the assignment which should indicate that name the key(Or at least can be a key) of the assignment. 
+
+The server will check if the Name is 
+\end{itemize}
+
+\end{enumerate}
+
+
+
+
+
+\end{document}
