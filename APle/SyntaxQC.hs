@@ -59,18 +59,6 @@ genFunctionWithEmptyTermList = do
     cs <- genSyntaxString
     return $ TFun (c++cs) []
 
--- A quick test to test parse number
--- if n < 0, add "~" before the absolute value of n
-
-prop_int :: Integer -> Bool
-prop_int n = if n >= 0
-    then (parseStringTerm opt (show n)) == (Right (TNum n))
-    else (parseStringTerm opt ("~" ++ (show (abs n)))) == (Right (TNum n))
-
-prop_string :: SyntaxString -> Bool
-prop_string s = let str = (genString s) in
-    (parseStringTerm opt str) == (Right $ TVar str)
-
 convert_term_to_string :: Term -> String
 convert_term_to_string (TVar name) = name
 convert_term_to_string (TNum num) = if num >= 0 
@@ -82,6 +70,18 @@ convert_term_to_string (TFun name ts) = name ++ "(" ++ (convert_terms_to_string 
 convert_terms_to_string :: [Term] -> String
 convert_terms_to_string [t] = convert_term_to_string t
 convert_terms_to_string (t:ts) = (convert_terms_to_string [t]) ++ "," ++ (convert_terms_to_string ts) 
+
+-- A quick test to test parse number
+-- if n < 0, add "~" before the absolute value of n
+prop_int :: Integer -> Bool
+prop_int n = if n >= 0
+    then (parseStringTerm opt (show n)) == (Right (TNum n))
+    else (parseStringTerm opt ("~" ++ (show (abs n)))) == (Right (TNum n))
+
+-- Test a radom and legal string 
+prop_string :: SyntaxString -> Bool
+prop_string s = let str = (genString s) in
+    (parseStringTerm opt str) == (Right $ TVar str)
 
 -- The generated term should be valid
 -- So it should not go to left branch
