@@ -158,27 +158,29 @@ instTerms (t:ts) = do
   ts1 <- instTerms ts
   return $ t1 ++ ts1
 
+illegalArg :: String
+illegalArg = "evalCond with illegal Arguments"
 -- Conditions and rule aplication
 -- tellVar call failS if t3 is bounded but 
 -- binding to the value n1 + n2
 evalCond :: PName -> [Term] -> Global [Term]
 evalCond "num" [(TNum n)] = return [(TNum n)]
-evalCond "num" _ = failH $ "evalCond with illegal Arguments"
+evalCond "num" _ = failH illegalArg
 evalCond "var" [(TVar v)] = return [(TVar v)]
-evalCond "var" _ = failH $ "evalCond with illegal Arguments"
+evalCond "var" _ = failH illegalArg
 evalCond "add" [(TNum n1), (TNum n2), (TNum n3)] = 
   if n1 + n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
 evalCond "add" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 + n2))]
-evalCond "add" _ = failH $ "evalCond with illegal Arguments"
+evalCond "add" _ = failH illegalArg
 evalCond "mul" [(TNum n1), (TNum n2), (TNum n3)] = 
   if n1 * n2 == n3 then return [(TNum n1), (TNum n2), (TNum n3)] else failS
 evalCond "mul" [(TNum n1), (TNum n2), (TVar name)] = return [(TNum n1), (TNum n2), (TNum (n1 * n2))]
-evalCond "mul" _ = failH $ "evalCond with illegal Arguments"
+evalCond "mul" _ = failH illegalArg
 evalCond "lexless" [(TNum n1), (TNum n2)] =
   if n1 < n2 then return [(TNum n1), (TNum n2)] else failS
 evalCond "lexless" [(TVar v1), (TVar v2)] = 
   if v1 < v2 then return [(TVar v1), (TVar v2)] else failS
-evalCond "lexless" _ = failH $ "evalCond with illegal Arguments"
+evalCond "lexless" _ = failH illegalArg
 evalCond p _ = failH $ "The predict " ++ p  ++ " is not defined"
 
 -- Use runlocal to convert local to global
