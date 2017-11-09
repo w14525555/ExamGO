@@ -45,11 +45,11 @@ checkParenthese fName ts opt = if (needParenthese fName ts opt)
 
 -- To check if need parenthese We shoudld 
 -- check if there is higher operation in Term list
--- If the higher function contain any elements in 
+-- If the higher function contain the next fun name in 
 -- The list of Terms, there should be parenthese
 needParenthese :: FName -> [Term] -> OpTable -> Bool
-needParenthese fName ts opt = length hightfunctions /= length (hightfunctions \\ (getFunctionNameFromTerms ts))
-    where hightfunctions = getHigherLevelFunction fName (getNameList opt) opt
+needParenthese fName ts opt = length higherfunctions /= length (higherfunctions \\ (getNextFunName (getFunctionNameFromTerms ts)))
+    where higherfunctions = getHigherLevelFunction fName (getNameList opt) opt
 
 -- A function a get all funName in [Term]
 getFunctionNameFromTerms :: [Term] -> [FName]
@@ -60,6 +60,12 @@ convertTermToFName :: Term -> [FName]
 convertTermToFName (TVar v) = []
 convertTermToFName (TNum i) = []
 convertTermToFName (TFun fName ts) = [fName] ++ (getFunctionNameFromTerms ts)
+
+getNextFunName :: [FName] -> [FName]
+getNextFunName [] = []
+getNextFunName [t] = [t]
+getNextFunName (t:ts) = [t]
+
 
 -- A function to get all higher operations in the Optable
 getSameLevelFunction :: FName -> OpTable -> [FName]

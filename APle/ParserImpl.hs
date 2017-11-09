@@ -55,6 +55,7 @@ parseStringCmds opt input = case readP_to_S (parseOptCmds opt <* eof) input of
 type OpTableElement = (Fixity, [FName])
 
 --- Opt functions
+
 -- Parse Term
 parseOptTerm :: OpTable -> OpTable -> ReadP Term
 parseOptTerm (OpTable [o]) opt = parseOptItem o opt
