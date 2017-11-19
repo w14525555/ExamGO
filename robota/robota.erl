@@ -199,7 +199,7 @@ handle_call({unavailable, Name}, From, State) ->
                     %% If there is no other 
                     case CurrentGradingList of 
                         [] ->
-                            %% Map all the molar grader and call unload function in the module
+                            %% Map all the modular grader and call unload function in the module
                             %% Use try catch to find possible errors.
                             try 
                                 lists:map(fun unload_all_modular_grader/1, PartsList),
